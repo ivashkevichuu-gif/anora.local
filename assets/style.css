@@ -1,0 +1,14 @@
+body { background: #f8f9fa; }
+.hero { background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); color: #fff; padding: 80px 0; }
+.hero h1 { font-size: 3rem; font-weight: 700; }
+.card { border: none; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.balance-card { background: linear-gradient(135deg, #0d6efd, #6610f2); color: #fff; border-radius: 16px; }
+.balance-card .amount { font-size: 2.5rem; font-weight: 700; }
+.nav-tabs .nav-link.active { font-weight: 600; }
+.table th { background: #f1f3f5; }
+.badge-pending { background: #ffc107; color: #000; }
+.badge-approved { background: #198754; color: #fff; }
+.badge-rejected { background: #dc3545; color: #fff; }
+.admin-sidebar { min-height: 100vh; background: #212529; }
+.admin-sidebar .nav-link { color: #adb5bd; }
+.admin-sidebar .nav-link:hover, .admin-sidebar .nav-link.active { color: #fff; background: rgba(255,255,255,.1); border-radius: 6px; }
