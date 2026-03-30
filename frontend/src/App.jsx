@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react'
+import React, { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider }  from './context/AuthContext'
 import { AdminProvider } from './context/AdminContext'
@@ -14,10 +14,22 @@ const Register    = lazy(() => import('./pages/Register'))
 const Verify      = lazy(() => import('./pages/Verify'))
 const Account     = lazy(() => import('./pages/Account'))
 const About       = lazy(() => import('./pages/About'))
-const AdminLogin  = lazy(() => import('./pages/admin/AdminLogin'))
-const AdminLayout = lazy(() => import('./components/AdminLayout'))
+const AdminLogin      = lazy(() => import('./pages/admin/AdminLogin'))
+const AdminLayout     = lazy(() => import('./components/AdminLayout'))
+const SystemBalance   = lazy(() => import('./pages/admin/SystemBalance'))
 
 export default function App() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    if (ref) {
+      localStorage.setItem('anora_ref', JSON.stringify({
+        code: ref,
+        expires: Date.now() + 7 * 24 * 60 * 60 * 1000
+      }))
+    }
+  }, [])
+
   return (
     <AuthProvider>
       <AdminProvider>
@@ -40,6 +52,9 @@ export default function App() {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/*"     element={
               <AdminRoute><AdminLayout /></AdminRoute>
+            } />
+            <Route path="/admin/system-balance" element={
+              <AdminRoute><SystemBalance /></AdminRoute>
             } />
 
             <Route path="*" element={<Navigate to="/" replace />} />

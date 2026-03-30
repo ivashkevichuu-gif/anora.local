@@ -7,13 +7,13 @@ import { motion } from 'framer-motion'
  * - disabled prop covers: loading, round finished, countdown=0, guest
  * - Button is non-interactive while loading (spam prevention)
  */
-export default function PlaceBetButton({ onBet, disabled, loading, isGuest }) {
+export default function PlaceBetButton({ onBet, disabled, loading, isGuest, betAmount = 1 }) {
   const isBlocked = disabled || loading || isGuest
 
   const label = isGuest  ? 'Login to Play'
               : loading  ? 'Placing…'
               : disabled ? 'Betting Closed'
-              : 'Place Bet — $1'
+              : `Place Bet — $${betAmount}`
 
   return (
     <motion.button

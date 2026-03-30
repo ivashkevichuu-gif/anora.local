@@ -9,7 +9,7 @@ function generateClientSeed() {
   return Array.from(arr).join('-')
 }
 
-export function useLottery(onBalanceUpdate) {
+export function useLottery(onBalanceUpdate, room = 1) {
   const [state, setState]         = useState(null)
   const [previous, setPrevious]   = useState(null)
   const [userId, setUserId]       = useState(null)
@@ -24,9 +24,16 @@ export function useLottery(onBalanceUpdate) {
   const onBalanceRef  = useRef(onBalanceUpdate)
   useEffect(() => { onBalanceRef.current = onBalanceUpdate }, [onBalanceUpdate])
 
+  // Reset game state when room changes
+  useEffect(() => {
+    setState(null)
+    setPrevious(null)
+    setBetError(null)
+  }, [room])
+
   const fetchStatus = useCallback(async () => {
     try {
-      const d = await api.lotteryStatus()
+      const d = await api.lotteryStatus(room)
       setState(d.current)
       setPrevious(d.previous)
       setUserId(d.user_id != null ? Number(d.user_id) : null)
@@ -35,7 +42,7 @@ export function useLottery(onBalanceUpdate) {
         onBalanceRef.current?.(d.balance)
       }
     } catch { /* silent */ }
-  }, [])
+  }, [room])
 
   useEffect(() => {
     fetchStatus()
@@ -54,7 +61,7 @@ export function useLottery(onBalanceUpdate) {
     setLastClientSeed(seed)
 
     try {
-      const d = await api.lotteryBet(seed)
+      const d = await api.lotteryBet(room, seed)
       setState(d.state)
       if (d.balance != null) {
         setBalance(d.balance)
@@ -66,7 +73,7 @@ export function useLottery(onBalanceUpdate) {
       setBetting(false)
       pendingBetRef.current = false
     }
-  }, [])
+  }, [room])
 
   return {
     state, previous, userId, balance, betting, betError, placeBet,

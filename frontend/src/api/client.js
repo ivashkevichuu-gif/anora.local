@@ -50,13 +50,14 @@ export const api = {
   adminAction:     body => request('/admin/action.php',       { method: 'POST', body: JSON.stringify(body) }),
 
   // Lottery
-  lotteryStatus: ()           => request('/lottery/status.php'),
-  lotteryBet:    (clientSeed) => request('/lottery/bet.php', {
+  lotteryStatus: (room = 1)           => request(`/lottery/status.php?room=${room}`),
+  lotteryBet:    (room, clientSeed)   => request('/lottery/bet.php', {
     method: 'POST',
-    body: JSON.stringify({ client_seed: clientSeed }),
+    body: JSON.stringify({ room, client_seed: clientSeed }),
   }),
-  lotteryVerify: (gameId)     => request(`/lottery/verify.php?game_id=${gameId}`),
+  lotteryVerify: (gameId)             => request(`/lottery/verify.php?game_id=${gameId}`),
 
   // Admin lottery
-  adminLotteryGames: () => request('/admin/lottery_games.php'),
+  adminLotteryGames:   ()             => request('/admin/lottery_games.php'),
+  adminSystemBalance:  (page = 1)     => request(`/admin/system_balance.php?page=${page}`),
 }

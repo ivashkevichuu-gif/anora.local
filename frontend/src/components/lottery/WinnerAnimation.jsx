@@ -110,9 +110,9 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
     setBlur(0)
   }, [tiles])
 
-  // ── Spin animation — runs ONCE when phase becomes SPINNING ────────────────
+  // ── Spin animation — runs ONCE when phase becomes DRAWING ────────────────
   useEffect(() => {
-    if (phase !== 'SPINNING' || !tiles.length || hasSpunRef.current) return
+    if (phase !== 'DRAWING' || !tiles.length || hasSpunRef.current) return
     hasSpunRef.current = true
 
     cancelAnimationFrame(rafRef.current)
@@ -165,7 +165,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
   }, [phase])
 
   if (!tiles.length || !winner) return null
-  if (phase !== 'SPINNING' && phase !== 'RESULT') return null
+  if (phase !== 'DRAWING' && phase !== 'RESULT') return null
 
   const revealed = phase === 'RESULT'
 
@@ -184,7 +184,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
       </AnimatePresence>
 
       <div className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
-        {phase === 'SPINNING' ? '🎰 Selecting winner…' : '🏆 Winner!'}
+        {phase === 'DRAWING' ? '🎰 Selecting winner…' : '🏆 Winner!'}
       </div>
 
       {/* Carousel container */}

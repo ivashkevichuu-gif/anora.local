@@ -4,20 +4,28 @@ import { useReducer, useEffect, useRef } from 'react'
  * UI state machine for the lottery panel.
  *
  * Phases:
- *   IDLE     — no active round data yet
- *   BETTING  — round is open, players can bet
- *   SPINNING — countdown hit 0, animation running
- *   RESULT   — animation done, winner shown, carousel stays visible
+ *   IDLE      — no active round data yet
+ *   BETTING   — round is open, players can bet
+ *   COUNTDOWN — backend countdown in progress, betting closed
+ *   DRAWING   — winner animation running
+ *   RESULT    — animation done, winner shown, carousel stays visible
+ *
+ * Valid transitions:
+ *   IDLE      → BETTING   : backend status is 'waiting' or 'countdown'
+ *   BETTING   → COUNTDOWN : backend status changes to 'countdown'
+ *   COUNTDOWN → DRAWING   : backend status changes to 'finished'
+ *   DRAWING   → RESULT    : timer fires after SPIN_DURATION + RESULT_HOLD
+ *   RESULT    → BETTING   : backend reports a new game_id
+ *
+ * Invalid transitions (rejected):
+ *   IDLE → DRAWING, BETTING → RESULT, DRAWING → BETTING, RESULT → DRAWING
  *
  * The machine is driven by backend polling data from useLottery.
  * It does NOT control the backend — it only maps backend state → UI phase.
- *
- * RESULT persists until the backend reports a NEW round (new game id).
- * That is the only trigger that collapses the carousel.
  */
 
 const SPIN_DURATION = 5500   // ms — rAF animation duration
-const RESULT_HOLD   = 2000   // ms — extra time to view winner before RESULT is set
+const RESULT_HOLD   = 2000   // ms — extra time to view winner before RESULT ends
 
 const initial = {
   phase:   'IDLE',
@@ -43,45 +51,78 @@ function reducer(state, action) {
         return state   // same game, stay in RESULT
       }
 
-      // ── SPINNING is owned by the timer — polling cannot interrupt it ────
-      if (state.phase === 'SPINNING') {
+      // ── DRAWING is owned by the timer — polling cannot interrupt it ─────
+      if (state.phase === 'DRAWING') {
         return state
       }
 
-      // ── IDLE or BETTING: map backend status → UI phase ──────────────────
-      if (game.status === 'waiting' || game.status === 'countdown') {
-        return { ...state, phase: 'BETTING', bets, pot: game.total_pot, gameId: game.id }
-      }
-
-      if (game.status === 'finished') {
-        // Coming from BETTING → start spin animation
-        if (state.phase === 'BETTING' && game.id === state.gameId) {
+      // ── IDLE: only allow transition to BETTING ───────────────────────────
+      if (state.phase === 'IDLE') {
+        if (game.status === 'waiting' || game.status === 'countdown') {
+          return { ...state, phase: 'BETTING', bets, pot: game.total_pot, gameId: game.id }
+        }
+        // IDLE → DRAWING is invalid; if finished, skip to RESULT directly
+        if (game.status === 'finished') {
           return {
             ...state,
-            phase:  'SPINNING',
+            phase:  'RESULT',
+            bets:   bets.length ? bets : state.bets,
+            winner: game.winner,
+            pot:    game.total_pot || state.pot,
+            gameId: game.id,
+          }
+        }
+        return state
+      }
+
+      // ── BETTING: can go to COUNTDOWN or DRAWING ──────────────────────────
+      if (state.phase === 'BETTING') {
+        if (game.status === 'countdown') {
+          // BETTING → COUNTDOWN
+          return { ...state, phase: 'COUNTDOWN', bets, pot: game.total_pot, gameId: game.id }
+        }
+        if (game.status === 'finished' && game.id === state.gameId) {
+          // BETTING → DRAWING (missed countdown, same game)
+          return {
+            ...state,
+            phase:  'DRAWING',
             bets:   bets.length ? bets : state.bets,
             winner: game.winner,
             pot:    game.total_pot || state.pot,
           }
         }
-
-        // Coming from IDLE (page load while game already finished)
-        // or BETTING with a different gameId (missed the transition) → go straight to RESULT
-        return {
-          ...state,
-          phase:  'RESULT',
-          bets:   bets.length ? bets : state.bets,
-          winner: game.winner,
-          pot:    game.total_pot || state.pot,
-          gameId: game.id,
+        if (game.status === 'waiting') {
+          // Stay in BETTING, update data
+          return { ...state, bets, pot: game.total_pot, gameId: game.id }
         }
+        // BETTING → RESULT is invalid; ignore
+        return state
+      }
+
+      // ── COUNTDOWN: can only go to DRAWING ───────────────────────────────
+      if (state.phase === 'COUNTDOWN') {
+        if (game.status === 'finished') {
+          // COUNTDOWN → DRAWING
+          return {
+            ...state,
+            phase:  'DRAWING',
+            bets:   bets.length ? bets : state.bets,
+            winner: game.winner,
+            pot:    game.total_pot || state.pot,
+          }
+        }
+        if (game.status === 'countdown') {
+          // Stay in COUNTDOWN, update data
+          return { ...state, bets, pot: game.total_pot }
+        }
+        return state
       }
 
       return state
     }
 
     case 'SPIN_DONE':
-      if (state.phase !== 'SPINNING') return state
+      if (state.phase !== 'DRAWING') return state
       return { ...state, phase: 'RESULT' }
 
     default:
@@ -89,7 +130,7 @@ function reducer(state, action) {
   }
 }
 
-export function useGameMachine(lotteryState, previous) {
+export function useGameMachine(lotteryState) {
   const [machine, dispatch] = useReducer(reducer, initial)
   const spinTimerRef        = useRef(null)
 
@@ -99,9 +140,9 @@ export function useGameMachine(lotteryState, previous) {
     dispatch({ type: 'SYNC', game: lotteryState.game, bets: lotteryState.bets ?? [] })
   }, [lotteryState])
 
-  // When SPINNING starts, schedule SPIN_DONE after animation completes
+  // When DRAWING starts, schedule SPIN_DONE after animation completes
   useEffect(() => {
-    if (machine.phase === 'SPINNING') {
+    if (machine.phase === 'DRAWING') {
       spinTimerRef.current = setTimeout(() => {
         dispatch({ type: 'SPIN_DONE' })
       }, SPIN_DURATION + RESULT_HOLD)

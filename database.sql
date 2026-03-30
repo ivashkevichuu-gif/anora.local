@@ -100,3 +100,113 @@ INSERT IGNORE INTO users (email, password, balance, is_verified, is_bot, display
     ('jordan@bot.internal', '$2y$10$unusable_hash_bots_cannot_login', 10000.00, 1, 1, 'Jordan'),
     ('taylor@bot.internal', '$2y$10$unusable_hash_bots_cannot_login', 10000.00, 1, 1, 'Taylor'),
     ('sam@bot.internal',    '$2y$10$unusable_hash_bots_cannot_login', 10000.00, 1, 1, 'Sam');
+
+-- ── Referral & audit columns on users (task 1.1) ─────────────────────────────
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS ref_code          VARCHAR(32)   UNIQUE NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS referred_by       INT           NULL,
+    ADD COLUMN IF NOT EXISTS referral_earnings DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS registration_ip   VARCHAR(45)   DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS is_banned         TINYINT(1)    NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS referral_locked   TINYINT(1)    NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS referral_snapshot JSON          DEFAULT NULL;
+
+-- Foreign key: referred_by → users.id (only add if constraint doesn't already exist)
+SET @fk_exists = (
+    SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME        = 'users'
+      AND CONSTRAINT_NAME   = 'fk_referred_by'
+      AND CONSTRAINT_TYPE   = 'FOREIGN KEY'
+);
+SET @sql = IF(@fk_exists = 0,
+    'ALTER TABLE users ADD CONSTRAINT fk_referred_by FOREIGN KEY (referred_by) REFERENCES users(id) ON DELETE SET NULL',
+    'SELECT 1 -- fk_referred_by already exists'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Index: idx_referred_by (only add if index doesn't already exist)
+SET @idx_exists = (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'users'
+      AND INDEX_NAME   = 'idx_referred_by'
+);
+SET @sql = IF(@idx_exists = 0,
+    'ALTER TABLE users ADD INDEX idx_referred_by (referred_by)',
+    'SELECT 1 -- idx_referred_by already exists'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ── Multi-room & payout columns on lottery_games (task 1.2) ──────────────────
+ALTER TABLE lottery_games
+    ADD COLUMN IF NOT EXISTS room           TINYINT        NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS payout_status  ENUM('pending','paid') NOT NULL DEFAULT 'pending',
+    ADD COLUMN IF NOT EXISTS payout_id      VARCHAR(36)    DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS commission     DECIMAL(12,2)  DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS referral_bonus DECIMAL(12,2)  DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS winner_net     DECIMAL(12,2)  DEFAULT NULL;
+
+-- Index: idx_room_status (only add if index doesn't already exist)
+SET @idx_exists = (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'lottery_games'
+      AND INDEX_NAME   = 'idx_room_status'
+);
+SET @sql = IF(@idx_exists = 0,
+    'ALTER TABLE lottery_games ADD INDEX idx_room_status (room, status)',
+    'SELECT 1 -- idx_room_status already exists'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ── Room column on lottery_bets (task 1.3) ────────────────────────────────────
+ALTER TABLE lottery_bets ADD COLUMN IF NOT EXISTS room TINYINT NOT NULL DEFAULT 1;
+
+-- ── System balance singleton (task 1.4) ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS system_balance (
+  id      INT           NOT NULL DEFAULT 1 PRIMARY KEY,
+  balance DECIMAL(15,2) NOT NULL DEFAULT 0.00
+);
+INSERT IGNORE INTO system_balance (id, balance) VALUES (1, 0.00);
+
+-- ── System transactions log (task 1.4) ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS system_transactions (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  game_id        INT           NULL,
+  payout_id      VARCHAR(36)   DEFAULT NULL,
+  amount         DECIMAL(12,2) NOT NULL,
+  type           VARCHAR(32)   NOT NULL,
+  source_user_id INT           NULL,
+  created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_game_payout_type (game_id, payout_id, type),
+  INDEX idx_created_at (created_at)
+);
+
+-- ── User transactions log (task 1.4) ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS user_transactions (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT           NOT NULL,
+  payout_id  VARCHAR(36)   DEFAULT NULL,
+  type       VARCHAR(32)   NOT NULL,
+  amount     DECIMAL(12,2) NOT NULL,
+  game_id    INT           NULL,
+  note       VARCHAR(255)  DEFAULT NULL,
+  created_at DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_game_user_type (game_id, user_id, type, payout_id),
+  INDEX idx_user_created (user_id, created_at)
+);
+
+-- ── Registration attempts (task 1.4) ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS registration_attempts (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  ip         VARCHAR(45) NOT NULL,
+  created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ip_created (ip, created_at)
+);

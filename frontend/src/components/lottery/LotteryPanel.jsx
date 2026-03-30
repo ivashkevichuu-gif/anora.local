@@ -12,21 +12,21 @@ import WinnerAnimation    from './WinnerAnimation'
 import BetsTable          from './BetsTable'
 import PreviousGame       from './PreviousGame'
 
-export default function LotteryPanel() {
+export default function LotteryPanel({ room = 1 }) {
   const { setUser } = useAuth()
   const { enabled: soundOn, toggle: toggleSound, play } = useSound()
 
   const onBalanceUpdate = useRef((b) => setUser(u => u ? { ...u, balance: b } : u)).current
-  const { state: lotteryState, previous, userId, betting, betError, placeBet, clientSeed } = useLottery(onBalanceUpdate)
+  const { state: lotteryState, previous, userId, betting, betError, placeBet, clientSeed } = useLottery(onBalanceUpdate, room)
 
   // ── State machine ──────────────────────────────────────────────────────────
-  const machine = useGameMachine(lotteryState, previous)
+  const machine = useGameMachine(lotteryState)
   const prevPhaseRef = useRef(machine.phase)
 
   // Sound effects driven by machine phase transitions
   useEffect(() => {
     const prev = prevPhaseRef.current
-    if (prev === 'SPINNING' && machine.phase === 'RESULT') play('win')
+    if (prev === 'DRAWING' && machine.phase === 'RESULT') play('win')
     prevPhaseRef.current = machine.phase
   }, [machine.phase, play])
 
@@ -50,13 +50,11 @@ export default function LotteryPanel() {
   const bets    = machine.phase === 'BETTING' ? (lotteryState?.bets ?? []) : machine.bets
   const myStats = lotteryState?.my_stats
 
-  // Betting allowed only in BETTING phase
+  // Betting allowed only in BETTING phase (not COUNTDOWN, DRAWING, or RESULT)
   const canBet = !!userId && machine.phase === 'BETTING'
-    && game?.status !== 'finished'
-    && !(game?.status === 'countdown' && (game?.countdown ?? 1) <= 0)
 
-  // UI freeze overlay: show when countdown=0 and we're about to spin
-  const uiLocked = machine.phase === 'SPINNING'
+  // UI freeze overlay: show when in DRAWING or RESULT phase
+  const uiLocked = machine.phase === 'DRAWING' || machine.phase === 'RESULT'
 
   const statusColor  = game?.status === 'countdown' ? 'rgba(0,255,136,0.1)'  : game?.status === 'finished' ? 'rgba(239,68,68,0.1)'  : 'rgba(255,255,255,0.05)'
   const statusBorder = game?.status === 'countdown' ? 'rgba(0,255,136,0.3)'  : game?.status === 'finished' ? 'rgba(239,68,68,0.3)'  : 'rgba(255,255,255,0.1)'
@@ -170,7 +168,7 @@ export default function LotteryPanel() {
         )}
 
         {/* Bet button */}
-        <PlaceBetButton onBet={handleBet} disabled={!canBet} loading={betting} isGuest={!userId} />
+        <PlaceBetButton onBet={handleBet} disabled={!canBet} loading={betting} isGuest={!userId} betAmount={room} />
 
         {/* Error */}
         <AnimatePresence>
@@ -210,9 +208,9 @@ export default function LotteryPanel() {
       </motion.div>
 
       {/* ── Winner animation — persistent, state-driven ── */}
-      {/* Shown in SPINNING and RESULT. Collapses only when machine returns to BETTING (new round). */}
+      {/* Shown in DRAWING and RESULT. Collapses only when machine returns to BETTING (new round). */}
       <AnimatePresence>
-        {(machine.phase === 'SPINNING' || machine.phase === 'RESULT') && (
+        {(machine.phase === 'DRAWING' || machine.phase === 'RESULT') && (
           <motion.div
             key="winner-panel"
             initial={{ opacity: 0, scale: 0.95 }}

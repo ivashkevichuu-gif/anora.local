@@ -6,9 +6,16 @@ require_once __DIR__ . '/../../includes/lottery.php';
 
 $userId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
 
+$room = (int)($_GET['room'] ?? 1);
+if (!in_array($room, [1, 10, 100], true)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid room. Must be 1, 10, or 100.']);
+    exit;
+}
+
 // UPDATED: pass userId so getGameState can compute my_stats
-$state    = getGameState($pdo, $userId);
-$previous = getLastFinishedGame($pdo);
+$state    = getGameState($pdo, $room, $userId);
+$previous = getLastFinishedGame($pdo, $room);
 
 // UPDATED: return current user balance for real-time sidebar display
 $balance = null;

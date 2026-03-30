@@ -11,13 +11,31 @@ export default function Register() {
 
   const handle = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
 
+  function readAnoraRef() {
+    try {
+      const raw = localStorage.getItem('anora_ref')
+      if (!raw) return null
+      const entry = JSON.parse(raw)
+      if (!entry || entry.expires < Date.now()) {
+        localStorage.removeItem('anora_ref')
+        return null
+      }
+      return entry.code
+    } catch {
+      localStorage.removeItem('anora_ref')
+      return null
+    }
+  }
+
   const submit = async e => {
     e.preventDefault()
     setError(null)
     if (form.password !== form.confirm) { setError('Passwords do not match.'); return }
     setBusy(true)
+    const referralCode = readAnoraRef()
     try {
-      const d = await authService.register(form.email, form.password)
+      const d = await authService.register(form.email, form.password, referralCode)
+      localStorage.removeItem('anora_ref')
       setSuccess(d)
     } catch (err) {
       setError(err.message)

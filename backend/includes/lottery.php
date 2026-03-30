@@ -21,6 +21,144 @@ define('LOTTERY_MAX_BETS_PER_SEC', 5);
 define('LOTTERY_HASH_FORMAT', '%s:%s:%d');
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Compute payout amounts for a given pot.
+//
+// Pure function — no DB access, no side effects. Easily unit-testable.
+//
+// Rules:
+//   - If pot >= 0.50:
+//       commission     = max(round(pot * 0.02, 2), 0.01)
+//       referral_bonus = max(round(pot * 0.01, 2), 0.01)
+//       winner_net     = pot - commission - referral_bonus  (subtraction only)
+//       If winner_net < 0: fallback to full-pot (commission=0, referral_bonus=0,
+//         winner_net=pot) and log a CRITICAL warning.
+//   - If pot < 0.50 (micro-pot exception):
+//       commission=0.00, referral_bonus=0.00, winner_net=pot
+//
+// Returns: ['commission' => float, 'referral_bonus' => float, 'winner_net' => float]
+//
+// Validates: Requirements 1.1, 1.2, 3.1, 3.2, 3.3
+// ─────────────────────────────────────────────────────────────────────────────
+function computePayoutAmounts(float $pot): array {
+    if ($pot >= 0.50) {
+        $commission     = max(round($pot * 0.02, 2), 0.01);
+        $referral_bonus = max(round($pot * 0.01, 2), 0.01);
+        $winner_net     = $pot - $commission - $referral_bonus;
+
+        if ($winner_net < 0) {
+            error_log(sprintf(
+                '[Payout] CRITICAL: winner_net < 0 for pot %.2f, falling back to full-pot payout',
+                $pot
+            ));
+            $commission     = 0.00;
+            $referral_bonus = 0.00;
+            $winner_net     = $pot;
+        }
+    } else {
+        $commission     = 0.00;
+        $referral_bonus = 0.00;
+        $winner_net     = $pot;
+    }
+
+    return [
+        'commission'     => $commission,
+        'referral_bonus' => $referral_bonus,
+        'winner_net'     => $winner_net,
+    ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resolve the eligible referrer for a given winner.
+//
+// Performs a two-phase eligibility check:
+//   1. Fast pre-check: reads winner's referred_by and referral_locked without
+//      locking — returns null immediately if no referrer or referral_locked = 0.
+//   2. Authoritative check: locks the referrer row via FOR UPDATE and re-verifies
+//      all Eligible_Referrer criteria on the live row:
+//        - is_verified = 1
+//        - is_banned = 0  (logs a warning if banned)
+//        - created_at <= NOW() - INTERVAL 24 HOUR
+//        - has at least one completed deposit in transactions table
+//
+// Returns the locked referrer row array if all checks pass, or null otherwise.
+// The caller is responsible for running this inside an open transaction so that
+// the FOR UPDATE lock is held until the payout commits.
+//
+// Parameters:
+//   $pdo      — active PDO connection (must be inside a transaction for locking)
+//   $winnerId — user id of the lottery winner
+//   $gameId   — game id used only for the banned-referrer log message (default 0)
+//
+// Validates: Requirements 2.1, 2.5, 12.4, 12.5, 12.6
+// ─────────────────────────────────────────────────────────────────────────────
+function resolveReferrer(PDO $pdo, int $winnerId, int $gameId = 0): ?array {
+    // Step 1: read winner's referred_by and referral_locked (no lock needed here)
+    $winnerStmt = $pdo->prepare(
+        "SELECT referred_by, referral_locked FROM users WHERE id = ?"
+    );
+    $winnerStmt->execute([$winnerId]);
+    $winnerRow = $winnerStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$winnerRow || $winnerRow['referred_by'] === null) {
+        return null;
+    }
+
+    $referrerId = (int)$winnerRow['referred_by'];
+
+    // Step 2: fast pre-check — if referral_locked = 0, skip the expensive lock
+    if ((int)$winnerRow['referral_locked'] === 0) {
+        return null;
+    }
+
+    // Step 3: lock the referrer row for authoritative re-verification
+    $lockStmt = $pdo->prepare(
+        "SELECT * FROM users WHERE id = ? FOR UPDATE"
+    );
+    $lockStmt->execute([$referrerId]);
+    $referrer = $lockStmt->fetch(PDO::FETCH_ASSOC);
+
+    // Referrer row deleted between pre-check and lock — treat as unclaimed
+    if (!$referrer) {
+        return null;
+    }
+
+    // Re-verify live row: must be verified
+    if ((int)$referrer['is_verified'] !== 1) {
+        return null;
+    }
+
+    // Re-verify live row: must not be banned
+    if ((int)$referrer['is_banned'] !== 0) {
+        error_log(sprintf(
+            '[Referral] Banned referrer %d — bonus unclaimed for game %d',
+            $referrerId,
+            $gameId
+        ));
+        return null;
+    }
+
+    // Re-verify live row: account must be at least 24 hours old
+    $ageStmt = $pdo->prepare(
+        "SELECT 1 FROM users WHERE id = ? AND created_at <= NOW() - INTERVAL 24 HOUR"
+    );
+    $ageStmt->execute([$referrerId]);
+    if (!$ageStmt->fetch()) {
+        return null;
+    }
+
+    // Re-verify live row: must have at least one completed deposit
+    $depositStmt = $pdo->prepare(
+        "SELECT 1 FROM transactions WHERE user_id = ? AND type = 'deposit' AND status = 'completed' LIMIT 1"
+    );
+    $depositStmt->execute([$referrerId]);
+    if (!$depositStmt->fetch()) {
+        return null;
+    }
+
+    return $referrer;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FINAL FIX: single hash → float conversion.
 // 52-bit integer from first 13 hex chars, divided by 2^52-1.
 // Locked to 12 decimal places. Used by ALL code paths — no divergence possible.
@@ -65,26 +203,31 @@ function fetchClientSeeds(PDO $pdo, int $gameId): array {
 // ─────────────────────────────────────────────────────────────────────────────
 // Get or create the active game.
 // ─────────────────────────────────────────────────────────────────────────────
-function getOrCreateActiveGame(PDO $pdo): array {
+function getOrCreateActiveGame(PDO $pdo, int $room = 1): array {
+    if (!in_array($room, [1, 10, 100], true)) {
+        throw new InvalidArgumentException('Invalid room. Must be 1, 10, or 100.');
+    }
+
     $stmt = $pdo->prepare(
         "SELECT * FROM lottery_games
-         WHERE status IN ('waiting','countdown')
+         WHERE status IN ('waiting','countdown') AND room = ?
          ORDER BY id DESC LIMIT 1"
     );
-    $stmt->execute();
+    $stmt->execute([$room]);
     $game = $stmt->fetch();
 
     if (!$game) {
         $serverSeed     = bin2hex(random_bytes(16));
         $serverSeedHash = hash('sha256', $serverSeed);
         $pdo->prepare(
-            "INSERT INTO lottery_games (status, server_seed, server_seed_hash)
-             VALUES ('waiting', ?, ?)"
-        )->execute([$serverSeed, $serverSeedHash]);
+            "INSERT INTO lottery_games (status, server_seed, server_seed_hash, room)
+             VALUES ('waiting', ?, ?, ?)"
+        )->execute([$serverSeed, $serverSeedHash, $room]);
         $id = (int)$pdo->lastInsertId();
-        error_log("[Lottery] New game created: #$id (seed_hash: $serverSeedHash)");
-        $stmt->execute();
-        return $stmt->fetch();
+        error_log("[Lottery] New game created: #$id room=$room (seed_hash: $serverSeedHash)");
+        $refetch = $pdo->prepare("SELECT * FROM lottery_games WHERE id = ?");
+        $refetch->execute([$id]);
+        return $refetch->fetch();
     }
 
     return $game;
@@ -201,8 +344,8 @@ function buildBetList(PDO $pdo, int $gameId, float $totalPot): array {
 // ─────────────────────────────────────────────────────────────────────────────
 // Full game state for frontend polling.
 // ─────────────────────────────────────────────────────────────────────────────
-function getGameState(PDO $pdo, ?int $currentUserId = null): array {
-    $game = getOrCreateActiveGame($pdo);
+function getGameState(PDO $pdo, int $room = 1, ?int $currentUserId = null): array {
+    $game = getOrCreateActiveGame($pdo, $room);
 
     if ($game['status'] === 'countdown') {
         $elapsed = time() - strtotime($game['started_at']);
@@ -260,6 +403,7 @@ function getGameState(PDO $pdo, ?int $currentUserId = null): array {
             'winner'           => $winner,
             'server_seed_hash' => $game['server_seed_hash'] ?? null,
             'server_seed'      => $game['status'] === 'finished' ? ($game['server_seed'] ?? null) : null,
+            'room'             => (int)$game['room'],
         ],
         'bets'           => $bets,
         'unique_players' => (int)$stats['unique_players'],
@@ -269,24 +413,71 @@ function getGameState(PDO $pdo, ?int $currentUserId = null): array {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Race-condition safe game finalization.
-// FINAL FIX: stores immutable snapshot at finish time.
+// Race-condition safe game finalization with payout engine.
+// Retry wrapper: up to 3 attempts on MySQL deadlock (1213) or lock timeout (1205).
 // ─────────────────────────────────────────────────────────────────────────────
 function finishGameSafe(PDO $pdo, int $gameId): array {
+    $maxRetries = 3;
+    $lastException = null;
+
+    for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+        try {
+            return finishGameSafeAttempt($pdo, $gameId);
+        } catch (PDOException $e) {
+            $code = (int)$e->getCode();
+            // 1213 = deadlock, 1205 = lock wait timeout
+            if (in_array($code, [1213, 1205], true) || str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'Lock wait timeout')) {
+                $lastException = $e;
+                error_log(sprintf('[Payout] Deadlock/timeout on attempt %d for game #%d: %s', $attempt, $gameId, $e->getMessage()));
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                usleep(50000 * $attempt); // 50ms, 100ms, 150ms
+                continue;
+            }
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    error_log(sprintf('[Payout] FATAL: 3 retries exhausted for game %d', $gameId));
+    throw $lastException;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Single attempt of the payout engine. Called by finishGameSafe.
+// Implements full commission + referral + idempotency logic.
+// ─────────────────────────────────────────────────────────────────────────────
+function finishGameSafeAttempt(PDO $pdo, int $gameId): array {
     $pdo->beginTransaction();
     try {
+        // Lock game row
         $stmt = $pdo->prepare("SELECT * FROM lottery_games WHERE id = ? FOR UPDATE");
         $stmt->execute([$gameId]);
         $game = $stmt->fetch();
 
-        if ($game['status'] === 'finished') { $pdo->rollBack(); return $game; }
-        if ($game['started_at'] === null)   { $pdo->rollBack(); return $game; }
+        if ($game['status'] === 'finished') {
+            $pdo->rollBack();
+            return $game;
+        }
+        if ($game['started_at'] === null) {
+            $pdo->rollBack();
+            return $game;
+        }
 
         $elapsed = time() - strtotime($game['started_at']);
-        if ($elapsed < LOTTERY_COUNTDOWN)   { $pdo->rollBack(); return $game; }
+        if ($elapsed < LOTTERY_COUNTDOWN) {
+            $pdo->rollBack();
+            return $game;
+        }
+
+        // Check payout_status guard (idempotency)
+        if ($game['payout_status'] === 'paid') {
+            $pdo->rollBack();
+            return $game;
+        }
 
         $pot = (float)$game['total_pot'];
 
+        // Handle zero-bet game
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM lottery_bets WHERE game_id = ?");
         $countStmt->execute([$gameId]);
         if ((int)$countStmt->fetchColumn() === 0) {
@@ -298,10 +489,11 @@ function finishGameSafe(PDO $pdo, int $gameId): array {
             return array_merge($game, ['status' => 'finished']);
         }
 
+        // Pick winner
         $result   = pickWeightedWinner($pdo, $gameId, $game['server_seed'] ?? '');
         $winnerId = $result['winner_id'];
 
-        // FINAL FIX: build immutable snapshot of all bets at this exact moment
+        // Build immutable snapshot
         $snapStmt = $pdo->prepare(
             "SELECT lb.id AS bet_id, lb.user_id, u.email,
                     lb.amount, COALESCE(lb.client_seed,'') AS client_seed
@@ -312,23 +504,121 @@ function finishGameSafe(PDO $pdo, int $gameId): array {
         $snapStmt->execute([$gameId]);
         $snapshot = $snapStmt->fetchAll();
 
+        // Compute payout amounts
+        $payout = computePayoutAmounts($pot);
+        $commission    = $payout['commission'];
+        $referralBonus = $payout['referral_bonus'];
+        $winnerNet     = $payout['winner_net'];
+
+        // Generate payout UUID
+        $payoutId = $pdo->query("SELECT UUID()")->fetchColumn();
+
+        // Resolve referrer (pre-check only — full lock happens after user lock below)
+        $winnerRefStmt = $pdo->prepare("SELECT referred_by, referral_locked FROM users WHERE id = ?");
+        $winnerRefStmt->execute([$winnerId]);
+        $winnerRefRow = $winnerRefStmt->fetch(PDO::FETCH_ASSOC);
+        $referrerId = null;
+        if ($winnerRefRow && $winnerRefRow['referred_by'] && (int)$winnerRefRow['referral_locked'] === 1) {
+            $referrerId = (int)$winnerRefRow['referred_by'];
+        }
+
+        // Lock users in deterministic order (ORDER BY id ASC) to prevent deadlocks
+        $userIds = array_unique(array_filter([$winnerId, $referrerId]));
+        sort($userIds);
+        $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+        $lockUsersStmt = $pdo->prepare(
+            "SELECT * FROM users WHERE id IN ($placeholders) ORDER BY id ASC FOR UPDATE"
+        );
+        $lockUsersStmt->execute($userIds);
+        $lockedUsers = [];
+        while ($row = $lockUsersStmt->fetch(PDO::FETCH_ASSOC)) {
+            $lockedUsers[(int)$row['id']] = $row;
+        }
+
+        // Lock system_balance
+        $pdo->prepare("SELECT balance FROM system_balance WHERE id = 1 FOR UPDATE")->execute();
+
+        // Credit winner
         $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")
-            ->execute([$pot, $winnerId]);
+            ->execute([$winnerNet, $winnerId]);
 
         $pdo->prepare(
-            "INSERT INTO transactions (user_id, type, amount, status, note)
-             VALUES (?, 'deposit', ?, 'completed', ?)"
-        )->execute([$winnerId, $pot, "Lottery win #$gameId"]);
+            "INSERT INTO user_transactions (user_id, type, amount, game_id, payout_id)
+             VALUES (?, 'win', ?, ?, ?)"
+        )->execute([$winnerId, $winnerNet, $gameId, $payoutId]);
 
-        // FINAL FIX: store snapshot + all draw parameters atomically with game close
+        // Resolve referrer using locked row
+        $eligibleReferrer = null;
+        if ($referrerId && isset($lockedUsers[$referrerId])) {
+            $referrerRow = $lockedUsers[$referrerId];
+            // Re-verify live locked row
+            if ((int)$referrerRow['is_verified'] === 1 && (int)$referrerRow['is_banned'] === 0) {
+                // Check age
+                $ageStmt = $pdo->prepare("SELECT 1 FROM users WHERE id = ? AND created_at <= NOW() - INTERVAL 24 HOUR");
+                $ageStmt->execute([$referrerId]);
+                if ($ageStmt->fetch()) {
+                    // Check deposit
+                    $depStmt = $pdo->prepare("SELECT 1 FROM transactions WHERE user_id = ? AND type = 'deposit' AND status = 'completed' LIMIT 1");
+                    $depStmt->execute([$referrerId]);
+                    if ($depStmt->fetch()) {
+                        $eligibleReferrer = $referrerRow;
+                    }
+                }
+            } elseif ((int)$referrerRow['is_banned'] === 1) {
+                error_log(sprintf('[Referral] Banned referrer %d — bonus unclaimed for game %d', $referrerId, $gameId));
+            }
+        }
+
+        if ($eligibleReferrer) {
+            // Credit referrer
+            $pdo->prepare(
+                "UPDATE users SET balance = balance + ?, referral_earnings = referral_earnings + ? WHERE id = ?"
+            )->execute([$referralBonus, $referralBonus, $referrerId]);
+
+            $pdo->prepare(
+                "INSERT INTO user_transactions (user_id, type, amount, game_id, payout_id)
+                 VALUES (?, 'referral_bonus', ?, ?, ?)"
+            )->execute([$referrerId, $referralBonus, $gameId, $payoutId]);
+
+            // One system_transactions row: commission only
+            $pdo->prepare(
+                "INSERT INTO system_transactions (game_id, payout_id, amount, type, source_user_id)
+                 VALUES (?, ?, ?, 'commission', ?)"
+            )->execute([$gameId, $payoutId, $commission, $winnerId]);
+
+            $pdo->prepare("UPDATE system_balance SET balance = balance + ? WHERE id = 1")
+                ->execute([$commission]);
+        } else {
+            // No eligible referrer: both commission and referral_bonus go to system
+            $pdo->prepare(
+                "INSERT INTO system_transactions (game_id, payout_id, amount, type, source_user_id)
+                 VALUES (?, ?, ?, 'commission', ?)"
+            )->execute([$gameId, $payoutId, $commission, $winnerId]);
+
+            $pdo->prepare(
+                "INSERT INTO system_transactions (game_id, payout_id, amount, type, source_user_id)
+                 VALUES (?, ?, ?, 'referral_unclaimed', ?)"
+            )->execute([$gameId, $payoutId, $referralBonus, $winnerId]);
+
+            $pdo->prepare("UPDATE system_balance SET balance = balance + ? WHERE id = 1")
+                ->execute([$commission + $referralBonus]);
+        }
+
+        // Update game: mark paid with snapshot
         $pdo->prepare(
             "UPDATE lottery_games
              SET status='finished', winner_id=?, finished_at=NOW(),
+                 payout_status='paid', payout_id=?,
+                 commission=?, referral_bonus=?, winner_net=?,
                  final_bets_snapshot=?, final_combined_hash=?,
                  final_rand_unit=?, final_target=?, final_total_weight=?
              WHERE id=?"
         )->execute([
             $winnerId,
+            $payoutId,
+            $commission,
+            $referralBonus,
+            $winnerNet,
             json_encode($snapshot),
             $result['combined_hash'],
             $result['rand_unit'],
@@ -339,20 +629,31 @@ function finishGameSafe(PDO $pdo, int $gameId): array {
 
         $pdo->commit();
         error_log(sprintf(
-            "[Lottery] Game #%d finished. Winner: #%d. Pot: $%.2f. Hash: %s. Target: %.12f",
-            $gameId, $winnerId, $pot, $result['combined_hash'], $result['target']
+            "[Lottery] Game #%d finished. Winner: #%d. Pot: $%.2f. Net: $%.2f. Commission: $%.2f. Referral: $%.2f. PayoutId: %s",
+            $gameId, $winnerId, $pot, $winnerNet, $commission, $referralBonus, $payoutId
         ));
 
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        // Unique constraint violation = already paid
+        if ((int)$e->getCode() === 23000 || str_contains($e->getMessage(), 'Duplicate entry')) {
+            error_log(sprintf('[Payout] Unique constraint violation for game #%d — treating as already paid. %s', $gameId, $e->getMessage()));
+            $stmt2 = $pdo->prepare("SELECT * FROM lottery_games WHERE id = ?");
+            $stmt2->execute([$gameId]);
+            return $stmt2->fetch();
+        }
+        throw $e;
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 
+    // Create next game (same room as the finished game)
     $serverSeed     = bin2hex(random_bytes(16));
     $serverSeedHash = hash('sha256', $serverSeed);
     $pdo->prepare(
-        "INSERT INTO lottery_games (status, server_seed, server_seed_hash) VALUES ('waiting', ?, ?)"
-    )->execute([$serverSeed, $serverSeedHash]);
+        "INSERT INTO lottery_games (status, server_seed, server_seed_hash, room) VALUES ('waiting', ?, ?, ?)"
+    )->execute([$serverSeed, $serverSeedHash, $game['room']]);
     $newId = (int)$pdo->lastInsertId();
     error_log("[Lottery] New game #$newId created (seed_hash: $serverSeedHash).");
 
@@ -362,10 +663,14 @@ function finishGameSafe(PDO $pdo, int $gameId): array {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Place a $1 bet.
+// Place a bet in the specified room (1, 10, or 100).
 // FINAL FIX: strict client_seed validation (uint32-uint32-uint32-uint32).
 // ─────────────────────────────────────────────────────────────────────────────
-function placeBet(PDO $pdo, int $userId, string $clientSeed = ''): array {
+function placeBet(PDO $pdo, int $userId, int $room = 1, string $clientSeed = ''): array {
+    if (!in_array($room, [1, 10, 100], true)) {
+        throw new InvalidArgumentException('Invalid room. Must be 1, 10, or 100.');
+    }
+
     // FINAL FIX: strict format — 4 uint32 values joined by dashes
     if ($clientSeed !== '') {
         if (!preg_match('/^\d{1,10}(-\d{1,10}){3}$/', $clientSeed)) {
@@ -373,7 +678,7 @@ function placeBet(PDO $pdo, int $userId, string $clientSeed = ''): array {
         }
     }
 
-    $game = getOrCreateActiveGame($pdo);
+    $game = getOrCreateActiveGame($pdo, $room);
 
     if ($game['status'] === 'finished') {
         throw new RuntimeException('This round has already finished.');
@@ -401,7 +706,7 @@ function placeBet(PDO $pdo, int $userId, string $clientSeed = ''): array {
         $stmt->execute([$userId]);
         $balance = (float)$stmt->fetchColumn();
 
-        if ($balance < LOTTERY_BET) {
+        if ($balance < $room) {
             $pdo->rollBack();
             throw new RuntimeException('Insufficient balance.');
         }
@@ -423,19 +728,19 @@ function placeBet(PDO $pdo, int $userId, string $clientSeed = ''): array {
         }
 
         $pdo->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")
-            ->execute([LOTTERY_BET, $userId]);
+            ->execute([$room, $userId]);
 
         $pdo->prepare(
-            "INSERT INTO lottery_bets (game_id, user_id, amount, client_seed) VALUES (?, ?, ?, ?)"
-        )->execute([$game['id'], $userId, LOTTERY_BET, $clientSeed ?: null]);
+            "INSERT INTO user_transactions (user_id, type, amount, game_id, payout_id)
+             VALUES (?, 'bet', ?, ?, NULL)"
+        )->execute([$userId, $room, $game['id']]);
+
+        $pdo->prepare(
+            "INSERT INTO lottery_bets (game_id, user_id, amount, client_seed, room) VALUES (?, ?, ?, ?, ?)"
+        )->execute([$game['id'], $userId, $room, $clientSeed ?: null, $room]);
 
         $pdo->prepare("UPDATE lottery_games SET total_pot = total_pot + ? WHERE id = ?")
-            ->execute([LOTTERY_BET, $game['id']]);
-
-        $pdo->prepare(
-            "INSERT INTO transactions (user_id, type, amount, status, note)
-             VALUES (?, 'withdrawal', ?, 'completed', ?)"
-        )->execute([$userId, LOTTERY_BET, "Lottery bet #{$game['id']}"]);
+            ->execute([$room, $game['id']]);
 
         $countStmt = $pdo->prepare(
             "SELECT COUNT(DISTINCT user_id) FROM lottery_bets WHERE game_id = ?"
@@ -451,28 +756,28 @@ function placeBet(PDO $pdo, int $userId, string $clientSeed = ''): array {
         }
 
         $pdo->commit();
-        error_log("[Lottery] Bet placed: user #$userId game #{$game['id']} seed=$clientSeed");
+        error_log("[Lottery] Bet placed: user #$userId game #{$game['id']} room=$room seed=$clientSeed");
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 
-    return getGameState($pdo, $userId);
+    return getGameState($pdo, $room, $userId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Last finished game for "previous round" display.
 // ─────────────────────────────────────────────────────────────────────────────
-function getLastFinishedGame(PDO $pdo): ?array {
+function getLastFinishedGame(PDO $pdo, int $room = 1): ?array {
     $stmt = $pdo->prepare(
         "SELECT g.*, u.email AS winner_email, u.display_name AS winner_display_name, u.is_bot AS winner_is_bot
          FROM lottery_games g
          LEFT JOIN users u ON u.id = g.winner_id
-         WHERE g.status = 'finished'
+         WHERE g.status = 'finished' AND g.room = ?
          ORDER BY g.finished_at DESC LIMIT 1"
     );
-    $stmt->execute();
+    $stmt->execute([$room]);
     $game = $stmt->fetch();
     if (!$game) return null;
 
@@ -489,6 +794,7 @@ function getLastFinishedGame(PDO $pdo): ?array {
         'finished_at'          => $game['finished_at'],
         'server_seed'          => $game['server_seed'],
         'bets'                 => $bets,
+        'room'                 => (int)$game['room'],
     ];
 }
 
