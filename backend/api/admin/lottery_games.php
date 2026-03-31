@@ -6,7 +6,8 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAdmin();
 
 $games = $pdo->query(
-    "SELECT g.id, g.status, g.total_pot, g.created_at, g.finished_at,
+    "SELECT g.id, g.status, g.room, g.total_pot, g.created_at, g.finished_at,
+            g.commission, g.referral_bonus, g.winner_net, g.payout_id,
             u.email as winner_email,
             (SELECT COUNT(*) FROM lottery_bets WHERE game_id = g.id) as player_count
      FROM lottery_games g

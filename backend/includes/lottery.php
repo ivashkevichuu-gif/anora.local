@@ -11,14 +11,14 @@
  *  - Rate limiting per user per second
  */
 
-define('LOTTERY_BET',              1.00);
-define('LOTTERY_COUNTDOWN',        30);
-define('LOTTERY_MIN_PLAYERS',      2);
-define('LOTTERY_MAX_BETS_PER_SEC', 5);
+defined('LOTTERY_BET')              || define('LOTTERY_BET',              1.00);
+defined('LOTTERY_COUNTDOWN')        || define('LOTTERY_COUNTDOWN',        30);
+defined('LOTTERY_MIN_PLAYERS')      || define('LOTTERY_MIN_PLAYERS',      2);
+defined('LOTTERY_MAX_BETS_PER_SEC') || define('LOTTERY_MAX_BETS_PER_SEC', 5);
 
 // FINAL FIX: locked hash format — changing this would break all past verifications
 // Format: server_seed:seed1:seed2:...:seedN:game_id
-define('LOTTERY_HASH_FORMAT', '%s:%s:%d');
+defined('LOTTERY_HASH_FORMAT')      || define('LOTTERY_HASH_FORMAT',      '%s:%s:%d');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Compute payout amounts for a given pot.

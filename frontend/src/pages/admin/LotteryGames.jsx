@@ -21,27 +21,54 @@ export default function AdminLotteryGames() {
         <div className="table-responsive">
           <table className="table table-hover align-middle">
             <thead>
-              <tr><th>#</th><th>Status</th><th>Players</th><th>Total Pot</th><th>Winner</th><th>Created</th><th>Finished</th></tr>
+              <tr>
+                <th>#</th>
+                <th>Room</th>
+                <th>Status</th>
+                <th>Players</th>
+                <th>Total Pot</th>
+                <th>Winner</th>
+                <th>Commission</th>
+                <th>Referral Bonus</th>
+                <th>Winner Net</th>
+                <th>Payout ID</th>
+                <th>Created</th>
+                <th>Finished</th>
+              </tr>
             </thead>
             <tbody>
-              {paginated.map(g => (
-                <tr key={g.id}>
-                  <td>{g.id}</td>
-                  <td>
-                    <span className={`badge ${
-                      g.status === 'finished'  ? 'badge-completed'
-                    : g.status === 'countdown' ? 'badge-pending'
-                    : 'bg-secondary'}`}>
-                      {g.status}
-                    </span>
-                  </td>
-                  <td>{g.player_count}</td>
-                  <td>${parseFloat(g.total_pot).toFixed(2)}</td>
-                  <td>{g.winner_email ?? '—'}</td>
-                  <td>{g.created_at}</td>
-                  <td>{g.finished_at ?? '—'}</td>
-                </tr>
-              ))}
+              {paginated.map(g => {
+                const finished = g.status === 'finished'
+                return (
+                  <tr key={g.id}>
+                    <td>{g.id}</td>
+                    <td>${g.room ?? 1}</td>
+                    <td>
+                      <span className={`badge ${
+                        finished           ? 'badge-completed'
+                      : g.status === 'countdown' ? 'badge-pending'
+                      : 'bg-secondary'}`}>
+                        {g.status}
+                      </span>
+                    </td>
+                    <td>{g.player_count}</td>
+                    <td>${parseFloat(g.total_pot).toFixed(2)}</td>
+                    <td>{g.winner_email ?? '—'}</td>
+                    <td>{finished && g.commission != null ? `$${parseFloat(g.commission).toFixed(2)}` : '—'}</td>
+                    <td>{finished && g.referral_bonus != null ? `$${parseFloat(g.referral_bonus).toFixed(2)}` : '—'}</td>
+                    <td>{finished && g.winner_net != null ? `$${parseFloat(g.winner_net).toFixed(2)}` : '—'}</td>
+                    <td>
+                      {finished && g.payout_id
+                        ? <span title={g.payout_id} style={{ fontFamily: 'monospace', fontSize: '.85rem' }}>
+                            {g.payout_id.slice(0, 8)}…
+                          </span>
+                        : '—'}
+                    </td>
+                    <td>{g.created_at}</td>
+                    <td>{g.finished_at ?? '—'}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

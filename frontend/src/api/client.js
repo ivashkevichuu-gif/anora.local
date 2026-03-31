@@ -39,7 +39,8 @@ export const api = {
   deposit:      body => request('/account/deposit.php',      { method: 'POST', body: JSON.stringify(body) }),
   withdraw:     body => request('/account/withdraw.php',     { method: 'POST', body: JSON.stringify(body) }),
   saveBank:     body => request('/account/bank.php',         { method: 'POST', body: JSON.stringify(body) }),
-  transactions: ()   => request('/account/transactions.php'),
+  transactions:     ()           => request('/account/transactions.php'),
+  userTransactions: (page = 1)  => request(`/account/transactions.php?page=${page}`),
 
   adminLogin:      body => request('/admin/login.php',        { method: 'POST', body: JSON.stringify(body) }),
   adminLogout:     ()   => request('/admin/logout.php',       { method: 'POST' }),

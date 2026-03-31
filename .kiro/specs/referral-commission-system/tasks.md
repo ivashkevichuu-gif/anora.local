@@ -228,7 +228,7 @@ database schema → backend core → API endpoints → frontend hooks → fronte
     - Tabs must be keyboard-navigable (use `<button>` elements with proper focus styles)
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
 
-- [ ] 16. Frontend Account page — referral dashboard and transaction history
+- [x] 16. Frontend Account page — referral dashboard and transaction history
   - In `frontend/src/pages/Account.jsx`:
     - Add referral dashboard section: display `https://anora.bet/?ref={ref_code}`, `referral_earnings`, referred user count (fetch from `/api/auth/me` which must return `ref_code`, `referral_earnings`, `referred_count`)
     - Add one-click copy button with "Copied!" confirmation for 2 seconds
@@ -238,7 +238,7 @@ database schema → backend core → API endpoints → frontend hooks → fronte
   - Add `backend/api/account/transactions.php` (if not already serving `user_transactions`): paginated `user_transactions` for current user
   - _Requirements: 15.5, 17.1, 17.2, 17.3, 17.4_
 
-- [~] 17. Admin panel — System Balance page and nav entry
+- [x] 17. Admin panel — System Balance page and nav entry
   - Create `frontend/src/pages/admin/SystemBalance.jsx`
     - Display current `system_balance.balance`, sum of commission entries, sum of referral_unclaimed entries
     - Paginated table of `system_transactions`: amount, type, source user email, payout_id, date
@@ -249,7 +249,7 @@ database schema → backend core → API endpoints → frontend hooks → fronte
     - Add `<Route path="system-balance" element={<SystemBalance />} />` inside Routes
   - _Requirements: 18.1, 18.2, 18.3, 18.4_
 
-- [~] 18. Admin Lottery Games page — display new financial columns
+- [x] 18. Admin Lottery Games page — display new financial columns
   - Update `frontend/src/pages/admin/LotteryGames.jsx` to display `room`, `commission`, `referral_bonus`, `winner_net`, `payout_id` for finished games
   - Update `backend/api/admin/lottery_games.php` to include these columns in the response
   - _Requirements: 16.3_
