@@ -102,14 +102,33 @@ INSERT IGNORE INTO users (email, password, balance, is_verified, is_bot, display
     ('sam@bot.internal',    '$2y$10$unusable_hash_bots_cannot_login', 10000.00, 1, 1, 'Sam');
 
 -- ── Referral & audit columns on users (task 1.1) ─────────────────────────────
+-- Add ref_code WITHOUT unique constraint first, so existing rows get empty string
 ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS ref_code          VARCHAR(32)   UNIQUE NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS ref_code          VARCHAR(32)   NOT NULL DEFAULT '',
     ADD COLUMN IF NOT EXISTS referred_by       INT           NULL,
     ADD COLUMN IF NOT EXISTS referral_earnings DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     ADD COLUMN IF NOT EXISTS registration_ip   VARCHAR(45)   DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS is_banned         TINYINT(1)    NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS referral_locked   TINYINT(1)    NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS referral_snapshot JSON          DEFAULT NULL;
+
+-- Backfill unique ref_codes for any existing users that have an empty ref_code
+UPDATE users SET ref_code = UPPER(SUBSTRING(MD5(CONCAT(id, email, RAND())), 1, 12)) WHERE ref_code = '';
+
+-- Now add the unique index (safe because all rows have distinct non-empty codes)
+SET @idx_exists = (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'users'
+      AND INDEX_NAME   = 'ref_code'
+);
+SET @sql = IF(@idx_exists = 0,
+    'ALTER TABLE users ADD UNIQUE KEY ref_code (ref_code)',
+    'SELECT 1 -- ref_code unique index already exists'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Foreign key: referred_by → users.id (only add if constraint doesn't already exist)
 SET @fk_exists = (

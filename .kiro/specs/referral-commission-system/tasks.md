@@ -30,10 +30,10 @@ database schema → backend core → API endpoints → frontend hooks → fronte
     - `CREATE TABLE IF NOT EXISTS registration_attempts` with `INDEX idx_ip_created (ip, created_at)`
     - _Requirements: 14.4, 14.5, 14.6, 14.7_
 
-- [ ] 2. Checkpoint — verify migrations
+- [x] 2. Checkpoint — verify migrations
   - Ensure all migrations apply cleanly with no errors. Confirm new columns and tables exist. Ask the user if questions arise.
 
-- [ ] 3. Payout engine — `backend/includes/lottery.php`
+- [x] 3. Payout engine — `backend/includes/lottery.php`
   - [x] 3.1 Add `computePayoutAmounts(float $pot): array`
     - Pure function: if `$pot >= 0.50` compute `commission = GREATEST(ROUND($pot * 0.02, 2), 0.01)`, `referral_bonus = GREATEST(ROUND($pot * 0.01, 2), 0.01)`, `winner_net = $pot - commission - referral_bonus`; else all zero and `winner_net = $pot`
     - If `winner_net < 0` fall back to full-pot and log `[Payout] CRITICAL: winner_net < 0 for game {id}, falling back to full-pot payout`
@@ -80,7 +80,7 @@ database schema → backend core → API endpoints → frontend hooks → fronte
     - Use eris/PHPUnit; tag each with `// Feature: referral-commission-system, Property N`
     - **Validates: Requirements 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 3.7, 4.2, 4.3, 4.6, 16.1, 16.2**
 
-- [ ] 4. Multi-room core — `backend/includes/lottery.php`
+- [x] 4. Multi-room core — `backend/includes/lottery.php`
   - [x] 4.1 Add `$room` parameter to `getOrCreateActiveGame`, `getGameState`, `getLastFinishedGame`
     - `getOrCreateActiveGame(PDO $pdo, int $room): array` — validate `$room IN (1, 10, 100)` or throw `InvalidArgumentException`; scope all queries with `WHERE room = ?`; set `room = $room` on INSERT
     - `getGameState(PDO $pdo, int $room, ?int $userId): array` — pass `$room` through; include `room` field in returned game object
@@ -102,7 +102,7 @@ database schema → backend core → API endpoints → frontend hooks → fronte
     - Use eris/PHPUnit; tag `// Feature: referral-commission-system, Property 9/10/11`
     - **Validates: Requirements 5.2, 5.3, 6.1, 6.2, 6.3, 6.4**
 
-- [ ] 5. Checkpoint — verify backend core
+- [x] 5. Checkpoint — verify backend core
   - Ensure all tests pass. Confirm `computePayoutAmounts`, `resolveReferrer`, `finishGameSafe` payout phase, and room-scoped functions work correctly. Ask the user if questions arise.
 
 - [x] 6. Registration handler — `backend/api/auth/register.php`
@@ -165,7 +165,7 @@ database schema → backend core → API endpoints → frontend hooks → fronte
     - Use eris/PHPUnit; tag `// Feature: referral-commission-system, Property 21`
     - **Validates: Requirements 19.1**
 
-- [ ] 9. Checkpoint — verify backend API layer
+- [x] 9. Checkpoint — verify backend API layer
   - Ensure all tests pass. Confirm room-scoped status/bet endpoints, system_balance admin endpoint, and cleanup script work correctly. Ask the user if questions arise.
 
 - [x] 10. Frontend API client — `frontend/src/api/client.js`
@@ -254,7 +254,7 @@ database schema → backend core → API endpoints → frontend hooks → fronte
   - Update `backend/api/admin/lottery_games.php` to include these columns in the response
   - _Requirements: 16.3_
 
-- [ ] 19. Final checkpoint — full integration
+- [x] 19. Final checkpoint — full integration
   - Ensure all tests pass. Verify end-to-end: place bets in each room, trigger finish, confirm winner balance, referrer balance, system_balance, all log rows, and game snapshot. Ask the user if questions arise.
 
 ## Notes
