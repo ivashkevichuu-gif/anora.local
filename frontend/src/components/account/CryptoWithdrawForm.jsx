@@ -69,7 +69,7 @@ export default function CryptoWithdrawForm({ defaultWallet, defaultCurrency }) {
   return (
     <div>
       <div className="card p-4 mb-4" style={{ maxWidth: 480 }}>
-        <h5 className="mb-3">
+        <h5 className="mb-3" style={{ color: 'var(--text)' }}>
           <i className="bi bi-wallet2 me-2" style={{ color: 'var(--accent)' }} />
           Crypto Withdrawal
         </h5>

@@ -109,10 +109,9 @@ export default function Sidebar({ open, onClose }) {
         </nav>
 
         <div className="sidebar-footer">
-          <Link to="/admin/login" className="sidebar-link" style={{ fontSize: '.8rem' }} onClick={onClose}>
-            <i className="bi bi-shield-lock"></i>
-            Admin Panel
-          </Link>
+          <div className="text-center" style={{ fontSize: '.7rem', color: 'var(--text-muted)', opacity: 0.5, padding: '8px 0' }}>
+           Build v1.0.0
+          </div>
         </div>
       </aside>
     </>

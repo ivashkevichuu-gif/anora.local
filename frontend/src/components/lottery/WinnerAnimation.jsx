@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -18,15 +18,15 @@ function getDisplayName(bet) {
 
 const TILE_W      = 80
 const TILE_GAP    = 10
-const TILE_STEP   = TILE_W + TILE_GAP   // 90px per slot
+const TILE_STEP   = TILE_W + TILE_GAP
 const CONTAINER_W = 400
-const CENTER      = CONTAINER_W / 2     // 200px — gold line
+const CENTER      = CONTAINER_W / 2
 
 const WINNER_IDX  = 150
 const STRIP_LEN   = 200
 
 const TARGET_X = CENTER - (WINNER_IDX * TILE_STEP + TILE_W / 2)
-const SPIN_MS = 5500
+const SPIN_MS  = 5500
 
 // ─── Casino easing ────────────────────────────────────────────────────────────
 function easeCasino(t) {
@@ -36,7 +36,7 @@ function easeCasino(t) {
   return 0.9 + (1 - Math.pow(1 - p, 3)) * 0.1
 }
 
-// ─── Weighted strip builder ───────────────────────────────────────────────────
+// ─── Weighted strip builder (deterministic once called) ───────────────────────
 function buildWeightedStrip(bets, winnerBet, winnerIdx, totalLen) {
   if (!bets.length) return []
 
@@ -57,7 +57,7 @@ function buildWeightedStrip(bets, winnerBet, winnerIdx, totalLen) {
   const others = bets.filter(b => b.user_id !== winnerBet.user_id)
   if (others.length > 0) {
     const nearMiss = others[Math.floor(Math.random() * others.length)]
-    if (winnerIdx > 0)           strip[winnerIdx - 1] = { ...nearMiss, _isWinner: false }
+    if (winnerIdx > 0)            strip[winnerIdx - 1] = { ...nearMiss, _isWinner: false }
     if (winnerIdx + 2 < totalLen) strip[winnerIdx + 2] = { ...nearMiss, _isWinner: false }
   }
 
@@ -71,38 +71,61 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
   const [blur, setBlur]         = useState(0)
   const [flashing, setFlashing] = useState(false)
 
+  // FROZEN snapshot: built once when animation starts, never updated by polling
+  const [frozenTiles, setFrozenTiles]   = useState([])
+  const [frozenWinner, setFrozenWinner] = useState(null)
+  const [frozenPot, setFrozenPot]       = useState(0)
+
   const rafRef      = useRef(null)
   const hasSpunRef  = useRef(false)
   const lastXRef    = useRef(0)
-  const velocityRef = useRef(0)
+  const builtForRef = useRef(null) // track which winner we built the strip for
 
   const winnerId = winner?.id ?? winner?.user_id ?? null
 
-  const tiles = useMemo(() => {
-    if (!bets?.length || winnerId == null) return []
-    const winnerBet = bets.find(b => b.user_id === winnerId) ?? bets[0]
-    return buildWeightedStrip(bets, winnerBet, WINNER_IDX, STRIP_LEN)
-  }, [bets, winnerId])
-
+  // Build the strip ONCE when we first enter DRAWING with valid data.
+  // Ignore all subsequent bets/winner updates from polling.
   useEffect(() => {
+    const isAnimating = phase === 'DRAWING' || phase === 'RESULT'
+    if (!isAnimating) {
+      // Reset when animation ends so next round gets a fresh strip
+      builtForRef.current = null
+      setFrozenTiles([])
+      setFrozenWinner(null)
+      setFrozenPot(0)
+      hasSpunRef.current = false
+      return
+    }
+
+    // Only build once per animation cycle
+    if (builtForRef.current !== null) return
+    if (!bets?.length || winnerId == null) return
+
+    const winnerBet = bets.find(b => b.user_id === winnerId) ?? bets[0]
+    const tiles = buildWeightedStrip(bets, winnerBet, WINNER_IDX, STRIP_LEN)
+
+    setFrozenTiles(tiles)
+    setFrozenWinner(winner)
+    setFrozenPot(pot)
+    builtForRef.current = winnerId
+
+    // Reset spin state for new animation
     hasSpunRef.current = false
     lastXRef.current   = 0
-    velocityRef.current = 0
     setStripX(0)
     setBlur(0)
-  }, [tiles])
+  }, [phase, bets, winnerId, winner, pot])
 
   // ── Spin animation ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'DRAWING' || !tiles.length || hasSpunRef.current) return
+    if (phase !== 'DRAWING' || !frozenTiles.length || hasSpunRef.current) return
     hasSpunRef.current = true
 
     cancelAnimationFrame(rafRef.current)
     setStripX(0)
     setBlur(0)
     setFlashing(false)
-    lastXRef.current    = 0
-    velocityRef.current = 0
+    lastXRef.current = 0
 
     let startTime = null
 
@@ -113,13 +136,10 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
       const currentX = TARGET_X * eased
 
       const dx = Math.abs(currentX - lastXRef.current)
-      velocityRef.current = dx
-      lastXRef.current    = currentX
-
-      const blurPx = Math.min(dx / 8, 8)
+      lastXRef.current = currentX
 
       setStripX(currentX)
-      setBlur(blurPx)
+      setBlur(Math.min(dx / 8, 8))
 
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(step)
@@ -131,7 +151,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
 
     rafRef.current = requestAnimationFrame(step)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [phase, tiles])
+  }, [phase, frozenTiles])
 
   // ── Flash on RESULT ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -143,11 +163,17 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
     return () => clearTimeout(t)
   }, [phase])
 
-  if (!tiles.length || !winner) return null
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [])
+
+  // Use frozen data for rendering — immune to polling updates
+  if (!frozenTiles.length || !frozenWinner) return null
   if (phase !== 'DRAWING' && phase !== 'RESULT') return null
 
   const revealed   = phase === 'RESULT'
-  const winnerName = winner.display_name || winner.email?.split('@')[0] || 'Winner'
+  const winnerName = frozenWinner.display_name || frozenWinner.email?.split('@')[0] || 'Winner'
 
   return (
     <div className="flex flex-col items-center gap-5 py-2 relative">
@@ -191,7 +217,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
         <div className="absolute bottom-0 z-20 pointer-events-none"
           style={{ left: CENTER - 7, width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '9px solid var(--neon-gold)' }} />
 
-        {/* Strip */}
+        {/* Strip — uses FROZEN tiles, immune to polling */}
         <div style={{
           position: 'absolute', top: 12, left: 0,
           display: 'flex', gap: TILE_GAP,
@@ -199,7 +225,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
           willChange: 'transform',
           filter: blur > 0.5 ? `blur(${blur.toFixed(1)}px)` : 'none',
         }}>
-          {tiles.map((bet, i) => {
+          {frozenTiles.map((bet, i) => {
             const highlight = bet._isWinner && revealed
             const name      = getDisplayName(bet)
             return (
@@ -238,7 +264,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
         </div>
       </div>
 
-      {/* Winner reveal card */}
+      {/* Winner reveal card — uses FROZEN winner data */}
       <AnimatePresence>
         {revealed && (
           <motion.div
@@ -269,7 +295,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
               {winnerName}
             </div>
 
-            {pot != null && (
+            {frozenPot != null && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -281,7 +307,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
                   filter: 'drop-shadow(0 0 14px rgba(245,158,11,0.7))',
                 }}
               >
-                +${parseFloat(pot).toFixed(2)}
+                +${parseFloat(frozenPot).toFixed(2)}
               </motion.div>
             )}
 

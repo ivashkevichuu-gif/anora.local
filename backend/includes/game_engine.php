@@ -500,17 +500,32 @@ class GameEngine
         }
 
         // Get current non-finished round, or latest round
+        // First check if there's a recently finished round (within 10 seconds) — 
+        // return it so the frontend can play the win animation before showing the new round
         $stmt = $this->pdo->prepare(
             "SELECT * FROM game_rounds
-             WHERE room = ? AND status IN ('waiting','active','spinning')
-             ORDER BY id DESC LIMIT 1"
+             WHERE room = ? AND status = 'finished'
+             AND finished_at >= NOW() - INTERVAL 10 SECOND
+             ORDER BY finished_at DESC LIMIT 1"
         );
         $stmt->execute([$room]);
-        $round = $stmt->fetch(PDO::FETCH_ASSOC);
+        $recentFinished = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$round) {
-            // No active round — get latest finished or create new
-            $round = $this->getOrCreateRound($room);
+        if ($recentFinished) {
+            $round = $recentFinished;
+        } else {
+            // Get current active/waiting/spinning round
+            $stmt = $this->pdo->prepare(
+                "SELECT * FROM game_rounds
+                 WHERE room = ? AND status IN ('waiting','active','spinning')
+                 ORDER BY id DESC LIMIT 1"
+            );
+            $stmt->execute([$room]);
+            $round = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$round) {
+                $round = $this->getOrCreateRound($room);
+            }
         }
 
         $roundId  = (int) $round['id'];
@@ -552,11 +567,15 @@ class GameEngine
         $statsStmt->execute([$roundId]);
         $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
 
-        // Countdown (only when active)
+        // Countdown (only when active) — use MySQL TIMESTAMPDIFF to avoid timezone mismatch
         $countdown = null;
         if ($round['status'] === 'active' && $round['started_at'] !== null) {
-            $elapsed   = time() - strtotime($round['started_at']);
-            $countdown = max(0, LOTTERY_COUNTDOWN - $elapsed);
+            $cdStmt = $this->pdo->prepare(
+                "SELECT GREATEST(0, ? - TIMESTAMPDIFF(SECOND, started_at, NOW())) AS countdown
+                 FROM game_rounds WHERE id = ?"
+            );
+            $cdStmt->execute([LOTTERY_COUNTDOWN, $roundId]);
+            $countdown = (int) $cdStmt->fetchColumn();
         }
 
         // Winner info (if finished)

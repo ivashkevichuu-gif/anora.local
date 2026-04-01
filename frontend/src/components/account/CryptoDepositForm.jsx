@@ -58,7 +58,7 @@ export default function CryptoDepositForm({ onSuccess }) {
   return (
     <div>
       <div className="card p-4 mb-4" style={{ maxWidth: 480 }}>
-        <h5 className="mb-3">
+        <h5 className="mb-3" style={{ color: 'var(--text)' }}>
           <i className="bi bi-currency-bitcoin me-2" style={{ color: 'var(--accent)' }} />
           Crypto Deposit
         </h5>

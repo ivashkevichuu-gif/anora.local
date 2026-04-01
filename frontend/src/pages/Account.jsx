@@ -11,11 +11,11 @@ import { api }      from '../api/client'
 
 const TABS = [
   { id: 'profile',        icon: 'person-circle',    label: 'Profile' },
-  { id: 'deposit',        icon: 'plus-circle',      label: 'Deposit' },
-  { id: 'withdraw',       icon: 'arrow-up-circle',  label: 'Withdraw' },
+  // { id: 'deposit',        icon: 'plus-circle',      label: 'Deposit' },
+  // { id: 'withdraw',       icon: 'arrow-up-circle',  label: 'Withdraw' },
   { id: 'crypto-deposit', icon: 'currency-bitcoin', label: 'Crypto Deposit' },
   { id: 'crypto-withdraw',icon: 'wallet2',          label: 'Crypto Withdraw' },
-  { id: 'bank',           icon: 'building',         label: 'Bank Details' },
+  // { id: 'bank',           icon: 'building',         label: 'Bank Details' },
   { id: 'history',        icon: 'clock-history',    label: 'History' },
   { id: 'referral',       icon: 'people',           label: 'Referral' },
 ]
@@ -159,7 +159,10 @@ function ReferralDashboard() {
 
   return (
     <div className="card p-4">
-      <h5 className="mb-4">Referral Dashboard</h5>
+      <h5 className="mb-4" style={{ color: 'var(--text)' }}>
+        <i className="bi bi-people me-2" style={{ color: 'var(--accent)' }}></i>
+        Referral Dashboard
+        </h5>
 
       <div className="row g-3 mb-4">
         <div className="col-sm-6">
@@ -230,7 +233,10 @@ function UserTransactions() {
 
   return (
     <div className="card p-3">
-      <h5 className="mb-3">Transaction History</h5>
+      <h5 className="mb-3" style={{ color: 'var(--text)' }}>
+        <i className="bi bi-clock-history me-2" style={{ color: 'var(--accent)' }}></i>
+        Transaction History
+        </h5>
       {txs.length === 0 ? (
         <p className="text-muted">No transactions yet.</p>
       ) : (
