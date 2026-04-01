@@ -16,12 +16,55 @@ export default function LotteryPanel({ room = 1 }) {
   const { setUser } = useAuth()
   const { enabled: soundOn, toggle: toggleSound, play } = useSound()
 
-  const onBalanceUpdate = useRef((b) => setUser(u => u ? { ...u, balance: b } : u)).current
+  // Buffer balance updates during DRAWING + RESULT phases — release when animation ends
+  const phaseRef = useRef('IDLE')
+  const pendingBalanceRef = useRef(null)
+  const preAnimBalanceRef = useRef(null) // balance before animation started
+
+  const onBalanceUpdate = useRef((b) => {
+    const p = phaseRef.current
+    if (p === 'DRAWING' || p === 'RESULT') {
+      // Hold the balance update — don't show it during animation
+      pendingBalanceRef.current = b
+      return
+    }
+    setUser(u => u ? { ...u, balance: b } : u)
+  }).current
+
   const { state: lotteryState, previous, userId, betting, betError, placeBet, clientSeed } = useLottery(onBalanceUpdate, room)
 
   // ── State machine ──────────────────────────────────────────────────────────
   const machine = useGameMachine(lotteryState)
   const prevPhaseRef = useRef(machine.phase)
+
+  // Track phase for balance buffering
+  useEffect(() => {
+    const prev = phaseRef.current
+    phaseRef.current = machine.phase
+
+    // Entering DRAWING — snapshot current balance
+    if (machine.phase === 'DRAWING' && prev !== 'DRAWING') {
+      preAnimBalanceRef.current = pendingBalanceRef.current
+    }
+
+    // Animation ended (back to BETTING/COUNTDOWN) — flush pending balance with win flash
+    if (prev === 'RESULT' && machine.phase !== 'RESULT' && machine.phase !== 'DRAWING') {
+      if (pendingBalanceRef.current !== null) {
+        const b = pendingBalanceRef.current
+        pendingBalanceRef.current = null
+        preAnimBalanceRef.current = null
+        setUser(u => u ? { ...u, balance: b } : u)
+      }
+    }
+
+    // Safety: if we somehow skip RESULT and go straight to BETTING
+    if (machine.phase !== 'DRAWING' && machine.phase !== 'RESULT' && pendingBalanceRef.current !== null) {
+      const b = pendingBalanceRef.current
+      pendingBalanceRef.current = null
+      preAnimBalanceRef.current = null
+      setUser(u => u ? { ...u, balance: b } : u)
+    }
+  }, [machine.phase, setUser])
 
   // Freeze "previous round" data during win animation — only update after animation ends
   const frozenPreviousRef = useRef(previous)

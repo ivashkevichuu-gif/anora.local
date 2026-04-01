@@ -1,0 +1,1 @@
+import{j as r}from"./index-qqXXb8-t.js";function l({error:e,success:a}){return e?r.jsx("div",{className:"alert alert-danger",children:e}):a!=null&&a.message?r.jsx("div",{className:"alert alert-success",children:a.message}):null}export{l as S};

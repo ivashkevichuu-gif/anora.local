@@ -122,13 +122,21 @@ class GameEngine
                 throw new RuntimeException('Betting is closed');
             }
 
+            // Count existing bets by this user in this round to generate unique reference_id
+            $betCountStmt = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM game_bets WHERE round_id = ? AND user_id = ?"
+            );
+            $betCountStmt->execute([$roundId, $userId]);
+            $betSeq = (int) $betCountStmt->fetchColumn() + 1;
+
             // Debit user balance via LedgerService
+            // reference_id includes round_id AND bet sequence to avoid idempotency collision
             $ledgerEntry = $this->ledger->addEntry(
                 $userId,
                 'bet',
                 $amount,
                 'debit',
-                (string) $roundId,
+                $roundId . ':' . $userId . ':' . $betSeq,
                 'game_bet',
                 ['source' => 'game_engine']
             );
