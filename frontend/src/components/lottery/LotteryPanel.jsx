@@ -23,6 +23,20 @@ export default function LotteryPanel({ room = 1 }) {
   const machine = useGameMachine(lotteryState)
   const prevPhaseRef = useRef(machine.phase)
 
+  // Freeze "previous round" data during win animation — only update after animation ends
+  const frozenPreviousRef = useRef(previous)
+  useEffect(() => {
+    const isAnimating = machine.phase === 'DRAWING' || machine.phase === 'RESULT'
+    if (!isAnimating) {
+      // Animation ended — update to latest
+      frozenPreviousRef.current = previous
+    }
+  }, [machine.phase, previous])
+  // Use frozen value during animation, live value otherwise
+  const displayPrevious = (machine.phase === 'DRAWING' || machine.phase === 'RESULT')
+    ? frozenPreviousRef.current
+    : previous
+
   // Sound effects driven by machine phase transitions
   useEffect(() => {
     const prev = prevPhaseRef.current
@@ -44,6 +58,18 @@ export default function LotteryPanel({ room = 1 }) {
     await placeBet()
     play('bet')
   }
+
+  // Freeze bets table during animation too
+  const frozenBetsRef = useRef(lotteryState?.bets ?? [])
+  useEffect(() => {
+    const isAnimating = machine.phase === 'DRAWING' || machine.phase === 'RESULT'
+    if (!isAnimating && lotteryState?.bets?.length) {
+      frozenBetsRef.current = lotteryState.bets
+    }
+  }, [machine.phase, lotteryState?.bets])
+  const displayBetsTable = (machine.phase === 'DRAWING' || machine.phase === 'RESULT')
+    ? frozenBetsRef.current
+    : (lotteryState?.bets ?? [])
 
   // ── Derived display values ─────────────────────────────────────────────────
   const game    = lotteryState?.game
@@ -238,12 +264,12 @@ export default function LotteryPanel({ room = 1 }) {
 
       {/* ── Live bets ── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <BetsTable bets={lotteryState?.bets ?? []} myUserId={userId} />
+        <BetsTable bets={displayBetsTable} myUserId={userId} />
       </motion.div>
 
       {/* ── Previous game ── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-        <PreviousGame game={previous} />
+        <PreviousGame game={displayPrevious} />
       </motion.div>
     </div>
   )

@@ -5,6 +5,7 @@ import WithdrawForm      from '../components/account/WithdrawForm'
 import BankForm          from '../components/account/BankForm'
 import CryptoDepositForm from '../components/account/CryptoDepositForm'
 import CryptoWithdrawForm from '../components/account/CryptoWithdrawForm'
+import PlayerStats       from '../components/account/PlayerStats'
 import Pagination   from '../components/ui/Pagination'
 import Spinner      from '../components/ui/Spinner'
 import { api }      from '../api/client'
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'crypto-deposit', icon: 'currency-bitcoin', label: 'Crypto Deposit' },
   { id: 'crypto-withdraw',icon: 'wallet2',          label: 'Crypto Withdraw' },
   // { id: 'bank',           icon: 'building',         label: 'Bank Details' },
+  { id: 'stats',          icon: 'bar-chart-fill',   label: 'Statistics' },
   { id: 'history',        icon: 'clock-history',    label: 'History' },
   { id: 'referral',       icon: 'people',           label: 'Referral' },
 ]
@@ -296,7 +298,12 @@ function UserTransactions() {
 // ── Main Account page ─────────────────────────────────────────────────────────
 export default function Account() {
   const { user, setUser } = useAuth()
-  const [tab, setTab]     = useState('profile')
+  const [tab, setTab]     = useState(() => localStorage.getItem('anora_account_tab') || 'profile')
+
+  const changeTab = (id) => {
+    setTab(id)
+    localStorage.setItem('anora_account_tab', id)
+  }
 
   const updateBalance  = newBalance => setUser(u => ({ ...u, balance: newBalance }))
   const updateNickname = newNick    => setUser(u => ({ ...u, nickname: newNick }))
@@ -325,7 +332,7 @@ export default function Account() {
           <li className="nav-item" key={t.id}>
             <button
               className={`nav-link ${tab === t.id ? 'active' : ''}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => changeTab(t.id)}
             >
               <i className={`bi bi-${t.icon} me-1`}></i>{t.label}
             </button>
@@ -340,6 +347,7 @@ export default function Account() {
         {tab === 'crypto-deposit'  && <CryptoDepositForm onSuccess={updateBalance} />}
         {tab === 'crypto-withdraw' && <CryptoWithdrawForm defaultWallet={user.default_wallet_address} defaultCurrency={user.default_crypto_currency} />}
         {tab === 'bank'     && <BankForm     bankDetails={user.bank_details} onSave={bd => setUser(u => ({ ...u, bank_details: bd }))} />}
+        {tab === 'stats'    && <PlayerStats />}
         {tab === 'history'  && <UserTransactions />}
         {tab === 'referral' && <ReferralDashboard />}
       </div>

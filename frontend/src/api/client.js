@@ -78,6 +78,9 @@ export const api = {
   adminCryptoPayouts:      (page = 1, status = '') => request(`/admin/crypto_payouts.php?page=${page}&status=${status}`),
   adminCryptoPayoutAction: body                    => request('/admin/crypto_payouts.php', { method: 'POST', body: JSON.stringify(body) }),
 
+  // Player stats
+  playerStats: (period = 'all') => request(`/account/stats.php?period=${period}`),
+
   // Admin lottery
   adminLotteryGames:   ()             => request('/admin/lottery_games.php'),
   adminSystemBalance:  (page = 1)     => request(`/admin/system_balance.php?page=${page}`),
