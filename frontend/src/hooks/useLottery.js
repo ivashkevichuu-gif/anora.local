@@ -85,7 +85,7 @@ export function useLottery(onBalanceUpdate, room = 1) {
       if (d.balance != null) {
         setUserId(prev => prev) // keep existing userId
         setBalance(d.balance)
-        onBalanceRef.current?.(d.balance)
+        onBalanceRef.current?.(d.balance, d.game?.status)
       }
 
       // Try to get userId from auth context (me endpoint sets it)
@@ -133,7 +133,7 @@ export function useLottery(onBalanceUpdate, room = 1) {
       }
       if (d.balance != null) {
         setBalance(d.balance)
-        onBalanceRef.current?.(d.balance)
+        onBalanceRef.current?.(d.balance, d.state?.round?.status)
       }
     } catch (e) {
       setBetError(e.message)

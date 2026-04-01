@@ -21,9 +21,13 @@ export default function LotteryPanel({ room = 1 }) {
   const pendingBalanceRef = useRef(null)
   const preAnimBalanceRef = useRef(null) // balance before animation started
 
-  const onBalanceUpdate = useRef((b) => {
+  const onBalanceUpdate = useRef((b, backendStatus) => {
     const p = phaseRef.current
-    if (p === 'DRAWING' || p === 'RESULT') {
+    // Buffer balance during animation phases OR when backend reports spinning/finished
+    // (the phaseRef may lag behind by one render cycle, so check backend status too)
+    const isAnimating = p === 'DRAWING' || p === 'RESULT'
+    const backendAnimating = backendStatus === 'spinning' || backendStatus === 'finished'
+    if (isAnimating || backendAnimating) {
       // Hold the balance update — don't show it during animation
       pendingBalanceRef.current = b
       return
