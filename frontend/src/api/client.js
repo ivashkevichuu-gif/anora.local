@@ -47,7 +47,7 @@ export const api = {
   adminLogout:     ()   => request('/admin/logout.php',       { method: 'POST' }),
   adminMe:         ()   => request('/admin/me.php'),
   adminUsers:      ()   => request('/admin/users.php'),
-  adminTxs:        ()   => request('/admin/transactions.php'),
+  adminTxs:        ()   => request('/admin/transactions.php?source=ledger'),
   adminWithdrawals:()   => request('/admin/withdrawals.php'),
   adminAction:     body => request('/admin/action.php',       { method: 'POST', body: JSON.stringify(body) }),
 

@@ -1,8 +1,24 @@
 import { useFetch } from '../../hooks/useFetch'
 import { adminService } from '../../services/adminService'
-import { TypeBadge, StatusBadge } from '../../components/ui/StatusBadge'
 import Spinner from '../../components/ui/Spinner'
 import Pagination, { usePagination } from '../../components/ui/Pagination'
+
+const directionColors = {
+  credit: 'var(--neon-green)',
+  debit:  '#f87171',
+}
+
+const typeBadgeColors = {
+  deposit:                   'bg-success',
+  crypto_deposit:            'bg-success',
+  bet:                       'bg-warning text-dark',
+  win:                       'bg-info text-dark',
+  system_fee:                'bg-secondary',
+  referral_bonus:            'bg-primary',
+  withdrawal:                'bg-danger',
+  crypto_withdrawal:         'bg-danger',
+  crypto_withdrawal_refund:  'bg-warning text-dark',
+}
 
 export default function AdminTransactions() {
   const { data, loading, error } = useFetch(adminService.getTransactions)
@@ -22,17 +38,29 @@ export default function AdminTransactions() {
         <div className="table-responsive">
           <table className="table table-hover align-middle">
             <thead>
-              <tr><th>#</th><th>User</th><th>Type</th><th>Amount</th><th>Status</th><th>Note</th><th>Date</th></tr>
+              <tr>
+                <th>#</th><th>User</th><th>Type</th><th>Direction</th>
+                <th>Amount</th><th>Balance After</th><th>Reference</th><th>Date</th>
+              </tr>
             </thead>
             <tbody>
               {paginated.map(tx => (
                 <tr key={tx.id}>
                   <td>{tx.id}</td>
                   <td>{tx.email}</td>
-                  <td><TypeBadge type={tx.type} /></td>
+                  <td>
+                    <span className={`badge ${typeBadgeColors[tx.type] ?? 'bg-secondary'}`}>
+                      {tx.type}
+                    </span>
+                  </td>
+                  <td style={{ color: directionColors[tx.direction] ?? 'var(--text)' }}>
+                    {tx.direction === 'credit' ? '+' : '−'}
+                  </td>
                   <td>${parseFloat(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td><StatusBadge status={tx.status} /></td>
-                  <td>{tx.note || '—'}</td>
+                  <td>${parseFloat(tx.balance_after).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>
+                    {tx.reference_type}:{tx.reference_id}
+                  </td>
                   <td>{tx.created_at}</td>
                 </tr>
               ))}

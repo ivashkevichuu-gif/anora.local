@@ -12,14 +12,15 @@ const BOT_MAX_BETS_PER_GAME = 15;     // hard cap per bot per round
 const BOT_MIN_BALANCE       = 50.0;
 const BOT_TOPUP_AMOUNT      = 1000.0;
 const BOT_MAX_BALANCE       = 50000;
-const BOT_ROOMS             = [1, 10, 100];
+const BOT_ROOMS             = [1];
 
 // Strategy thresholds
 const BOT_TARGET_WIN_CHANCE  = 0.35;  // bots aim for ~35% win chance per round
-const BOT_MAX_POT_EXPOSURE   = 0.05;  // never risk more than 5% of balance in one round
-const BOT_RETREAT_CHANCE     = 0.55;  // stop adding bets if already above 55% chance
-const BOT_HUMAN_CHASE_FACTOR = 0.6;   // when humans bet big, bots match up to 60% of human total
-const BOT_LOW_BALANCE_GUARD  = 200.0; // play conservatively below this balance
+const BOT_MAX_POT_EXPOSURE   = 0.15;  // never risk more than 15% of balance in one round
+const BOT_RETREAT_CHANCE     = 0.60;  // stop adding bets if already above 60% chance
+const BOT_HUMAN_CHASE_FACTOR = 0.7;   // match up to 70% of opponent total
+const BOT_LOW_BALANCE_GUARD  = 20.0;  // play conservatively below this balance
+const BOT_REBUY_CHANCE       = 45;    // % chance per tick to add more bets in active round
 
 $ledger = new LedgerService($pdo);
 $engine = new GameEngine($pdo, $ledger);
@@ -108,10 +109,10 @@ function analyzeRound(PDO $pdo, int $roundId, int $botId): array {
  * Decide how many additional bets this bot should place in this round.
  *
  * Strategy:
- *  - If no humans yet, place 1 bet to seed the round (liquidity)
+ *  - Compete against ALL opponents (bots + humans), not just humans
  *  - If already above retreat threshold, stop
- *  - If low balance, play conservatively (1 bet max, only if chance is low)
- *  - Chase human bets: try to get close to target win chance
+ *  - If low balance, play conservatively
+ *  - Chase opponent bets to reach target win chance
  *  - Never exceed max pot exposure relative to balance
  *  - Add randomness so bots don't all behave identically
  */
@@ -119,7 +120,9 @@ function decideBetCount(array $intel, float $botBalance, int $room): int {
     $myChance   = $intel['my_chance'];
     $myBetCount = $intel['my_bet_count'];
     $pot        = $intel['pot'];
-    $humanTotal = $intel['human_total'];
+
+    // Total opponent bets = pot minus my own bets
+    $opponentTotal = $pot - $intel['my_total'];
 
     // Hard cap
     if ($myBetCount >= BOT_MAX_BETS_PER_GAME) {
@@ -147,51 +150,44 @@ function decideBetCount(array $intel, float $botBalance, int $room): int {
 
     // Low balance — play very conservatively
     if ($botBalance < BOT_LOW_BALANCE_GUARD) {
-        // Only bet if we have no bets yet and there are humans to play against
-        if ($myBetCount === 0 && $intel['human_count'] > 0) {
+        if ($myBetCount === 0 && $intel['unique_players'] > 0) {
             return 1;
         }
         return 0;
     }
 
-    // No humans yet — seed with 1 bet for liquidity
-    if ($intel['human_count'] === 0) {
+    // No opponents yet — seed with 1 bet
+    if ($opponentTotal <= 0) {
         return $myBetCount === 0 ? 1 : 0;
     }
 
     // ── Strategic chase logic ──
-    // Goal: reach target win chance by matching a fraction of human bets
-    // If humans bet $20 total, bot wants to have ~$12 in the pot (60% chase)
-    $targetBotTotal = $humanTotal * BOT_HUMAN_CHASE_FACTOR;
-    $deficit = $targetBotTotal - $intel['my_total'];
+    // Goal: reach target win chance by matching a fraction of opponent bets
+    $targetMyTotal = $opponentTotal * BOT_HUMAN_CHASE_FACTOR;
+    $deficit = $targetMyTotal - $intel['my_total'];
 
     if ($deficit <= 0) {
         // Already at or above chase target — maybe 1 more with low probability
-        return (random_int(1, 100) <= 15) ? 1 : 0;
+        return (random_int(1, 100) <= 20) ? 1 : 0;
     }
 
     $wantedBets = (int)ceil($deficit / $room);
     $wantedBets = min($wantedBets, $remaining);
 
-    // Don't go all-in at once — spread bets over ticks with some randomness
-    // Place 1-3 bets per tick, leaving room for future ticks
+    // Spread bets over ticks: 1-3 per tick
     $maxPerTick = min($wantedBets, random_int(1, 3));
 
-    // Chance-based dampening: the closer we are to target, the less eager
+    // Chance-based dampening near target
     if ($myChance > BOT_TARGET_WIN_CHANCE) {
-        // Above target — only 30% chance to add 1 more
-        return (random_int(1, 100) <= 30) ? 1 : 0;
+        return (random_int(1, 100) <= 35) ? 1 : 0;
     }
 
     return $maxPerTick;
 }
 
 /**
- * Pick the best bot for this round based on strategic fit.
- * Prefers bots that:
- *  - Have enough balance for the room
- *  - Haven't hit the bet cap
- *  - Have the most to gain (lowest current chance in this round)
+ * Pick a bot for this round. Includes bots already in the round (for re-buys)
+ * and new bots (for joining). Prefers bots with lower win chance.
  */
 function pickStrategicBot(PDO $pdo, int $roundId, int $room): ?array {
     $stmt = $pdo->prepare(
@@ -205,8 +201,8 @@ function pickStrategicBot(PDO $pdo, int $roundId, int $room): ?array {
            AND u.balance >= :betAmount
          GROUP BY u.id, u.balance
          HAVING round_bets < :maxBets
-         ORDER BY round_total ASC, u.balance DESC
-         LIMIT 3"
+         ORDER BY RAND()
+         LIMIT 5"
     );
     $stmt->execute([
         ':roundId'   => $roundId,
@@ -219,7 +215,7 @@ function pickStrategicBot(PDO $pdo, int $roundId, int $room): ?array {
         return null;
     }
 
-    // Pick from top 3 with slight randomness (don't always pick the same bot)
+    // Pick randomly from candidates
     return $candidates[array_rand($candidates)];
 }
 
@@ -278,15 +274,13 @@ function runBotTickForRoom(PDO $pdo, GameEngine $engine, LedgerService $ledger, 
         $bot = pickStrategicBot($pdo, $roundId, $room);
         if ($bot) {
             $botId = (int)$bot['id'];
-            // Check this bot isn't already the only player
-            $myBets = 0;
             $myStmt = $pdo->prepare("SELECT COUNT(*) FROM game_bets WHERE user_id = ? AND round_id = ?");
             $myStmt->execute([$botId, $roundId]);
             $myBets = (int)$myStmt->fetchColumn();
 
             if ($myBets === 0 || $uniquePlayers === 0) {
                 try {
-                    usleep(random_int(100000, 500000)); // human-like delay
+                    usleep(random_int(100000, 500000));
                     $engine->placeBet($botId, $room, generateBotSeed());
                     error_log("[Bot][seed] Bot #$botId seeded room $room round #$roundId");
                 } catch (\Throwable $e) {
@@ -294,33 +288,46 @@ function runBotTickForRoom(PDO $pdo, GameEngine $engine, LedgerService $ledger, 
                 }
             }
         }
-        return; // don't do strategic betting yet — wait for humans
+        return; // wait for 2nd player before strategic play
     }
 
-    // ── Strategic betting: analyze and decide ──
+    // ── Let additional bots join active rounds (30% chance per tick) ──
+    if ($game['status'] === 'active' && random_int(1, 100) <= 30) {
+        $joiner = pickStrategicBot($pdo, $roundId, $room);
+        if ($joiner) {
+            $joinerId = (int)$joiner['id'];
+            $joinStmt = $pdo->prepare("SELECT COUNT(*) FROM game_bets WHERE user_id = ? AND round_id = ?");
+            $joinStmt->execute([$joinerId, $roundId]);
+            if ((int)$joinStmt->fetchColumn() === 0) {
+                try {
+                    usleep(random_int(200000, 800000));
+                    $engine->placeBet($joinerId, $room, generateBotSeed());
+                    error_log("[Bot][join] Bot #$joinerId joined room $room round #$roundId");
+                } catch (\Throwable $e) {
+                    error_log("[Bot] Join bet failed: " . $e->getMessage());
+                }
+            }
+        }
+    }
 
-    // Base activity chance — not every tick produces a bet
-    // Higher rooms = less frequent ticks (more deliberate)
-    $activityChance = match ($room) {
-        1   => 50,
-        10  => 35,
-        100 => 20,
-        default => 40,
-    };
+    // ── Strategic betting: existing bots add bets to increase win chance ──
+
+    // Base activity chance
+    $activityChance = 45;
 
     // Boost near end of countdown — last-second drama
     if ($game['status'] === 'active') {
         $elapsed   = time() - strtotime($game['started_at']);
         $remaining = LOTTERY_COUNTDOWN - $elapsed;
-        if ($remaining <= 8) $activityChance += 25;
-        if ($remaining <= 3) $activityChance += 20;
+        if ($remaining <= 10) $activityChance += 20;
+        if ($remaining <= 5)  $activityChance += 20;
     }
 
     if (random_int(1, 100) > $activityChance) {
         return;
     }
 
-    // Pick a bot and analyze the round from their perspective
+    // Pick a bot already in the round OR a new one — prefer bots with low chance
     $bot = pickStrategicBot($pdo, $roundId, $room);
     if (!$bot) return;
 
@@ -336,13 +343,14 @@ function runBotTickForRoom(PDO $pdo, GameEngine $engine, LedgerService $ledger, 
     }
 
     error_log(sprintf(
-        "[Bot][strategy] Bot #%d room %d: pot=$%.2f myChance=%.1f%% humans=$%.2f → placing %d bet(s)",
-        $botId, $room, $intel['pot'], $intel['my_chance'] * 100, $intel['human_total'], $betCount
+        "[Bot][strategy] Bot #%d room %d: pot=$%.2f myChance=%.1f%% opponents=$%.2f → placing %d bet(s)",
+        $botId, $room, $intel['pot'], $intel['my_chance'] * 100,
+        $intel['pot'] - $intel['my_total'], $betCount
     ));
 
     for ($i = 0; $i < $betCount; $i++) {
         try {
-            usleep(random_int(80000, 400000)); // human-like spacing
+            usleep(random_int(80000, 400000));
             $engine->placeBet($botId, $room, generateBotSeed());
         } catch (RuntimeException | InvalidArgumentException $e) {
             error_log("[Bot] Bot #$botId room $room bet failed: " . $e->getMessage());
