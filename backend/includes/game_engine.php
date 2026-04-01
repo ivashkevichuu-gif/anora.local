@@ -84,6 +84,13 @@ class GameEngine
 
         $amount = (float) $room;
 
+        // Auto-generate client seed if missing (mandatory for provably fair entropy)
+        if ($clientSeed === '') {
+            $bytes = random_bytes(16);
+            $ints = array_values(unpack('N4', $bytes));
+            $clientSeed = implode('-', $ints);
+        }
+
         // Anti-fraud: max 60 bets per minute per user
         $minuteStmt = $this->pdo->prepare(
             "SELECT COUNT(*) FROM game_bets WHERE user_id = ? AND created_at >= NOW() - INTERVAL 1 MINUTE"
@@ -122,6 +129,13 @@ class GameEngine
                 throw new RuntimeException('Betting is closed');
             }
 
+            // Lock user balance and check funds BEFORE debit (race condition fix)
+            $lockedBalance = $this->ledger->getBalanceForUpdate($userId);
+            if ($lockedBalance < $amount) {
+                $this->pdo->rollBack();
+                throw new RuntimeException('Insufficient balance');
+            }
+
             // Count existing bets by this user in this round to generate unique reference_id
             $betCountStmt = $this->pdo->prepare(
                 "SELECT COUNT(*) FROM game_bets WHERE round_id = ? AND user_id = ?"
@@ -151,7 +165,7 @@ class GameEngine
                 $roundId,
                 $userId,
                 $amount,
-                $clientSeed !== '' ? $clientSeed : null,
+                $clientSeed,
                 $ledgerEntryId,
             ]);
 
@@ -377,6 +391,8 @@ class GameEngine
             $winCount = (int) $streakStmt->fetchColumn();
             if ($winCount >= 10) {
                 error_log(sprintf('[AntifraudHook] Suspicious win streak: user #%d has %d wins in 24h', $winnerId, $winCount));
+                // Auto-flag the user for admin review
+                $this->pdo->prepare("UPDATE users SET fraud_flagged = 1 WHERE id = ?")->execute([$winnerId]);
             }
 
             // System fee

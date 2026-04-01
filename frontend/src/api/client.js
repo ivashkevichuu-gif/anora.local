@@ -81,6 +81,14 @@ export const api = {
   // Player stats
   playerStats: (period = 'all') => request(`/account/stats.php?period=${period}`),
 
+  // Admin hardening
+  adminLedger: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/admin/ledger.php?${qs}`);
+  },
+  adminActivityMonitor: () => request('/admin/activity_monitor.php'),
+  adminLotteryGameDetail: (roundId) => request(`/admin/lottery_games.php?round_id=${roundId}`),
+
   // Admin lottery
   adminLotteryGames:   ()             => request('/admin/lottery_games.php'),
   adminSystemBalance:  (page = 1)     => request(`/admin/system_balance.php?page=${page}`),

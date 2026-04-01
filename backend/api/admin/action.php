@@ -10,8 +10,36 @@ $input  = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';
 $id     = (int)($input['id'] ?? 0);
 
-if (!$id || !in_array($action, ['approve', 'reject'])) {
+if (!$id || !in_array($action, ['approve', 'reject', 'ban', 'clear_fraud_flag'])) {
     echo json_encode(['error' => 'Invalid request.']); exit;
+}
+
+// Handle ban action
+if ($action === 'ban') {
+    $user = $pdo->prepare('SELECT id FROM users WHERE id = ?');
+    $user->execute([$id]);
+    if (!$user->fetch()) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+    $pdo->prepare('UPDATE users SET is_banned = 1 WHERE id = ?')->execute([$id]);
+    echo json_encode(['message' => 'User banned.']);
+    exit;
+}
+
+// Handle clear_fraud_flag action
+if ($action === 'clear_fraud_flag') {
+    $user = $pdo->prepare('SELECT id FROM users WHERE id = ?');
+    $user->execute([$id]);
+    if (!$user->fetch()) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+    $pdo->prepare('UPDATE users SET fraud_flagged = 0 WHERE id = ?')->execute([$id]);
+    echo json_encode(['message' => 'Fraud flag cleared.']);
+    exit;
 }
 
 $req = $pdo->prepare('SELECT * FROM withdrawal_requests WHERE id = ? AND status = "pending"');

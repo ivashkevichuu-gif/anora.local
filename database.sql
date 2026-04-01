@@ -363,3 +363,6 @@ VALUES (0, 'system@anora.internal', '$2y$10$unusable_hash_system', 0.00, 1, 1, '
 INSERT IGNORE INTO user_balances (user_id, balance) VALUES (0, 0.00000000);
 
 SET sql_mode = @old_sql_mode;
+
+-- ── Production Hardening ─────────────────────────────────────────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS fraud_flagged TINYINT(1) NOT NULL DEFAULT 0;
