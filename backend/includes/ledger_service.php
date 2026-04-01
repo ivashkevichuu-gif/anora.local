@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-define('SYSTEM_USER_ID', 0);
+define('SYSTEM_USER_ID', 1);
 
 class LedgerService
 {

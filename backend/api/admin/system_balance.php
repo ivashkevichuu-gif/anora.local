@@ -9,10 +9,10 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 20;
 $offset = ($page - 1) * $perPage;
 
-// Try reading System_Account balance from user_balances (SYSTEM_USER_ID = 0)
+// Try reading System_Account balance from user_balances (SYSTEM_USER_ID = 1)
 $balance = null;
 try {
-    $ubRow = $pdo->prepare('SELECT balance FROM user_balances WHERE user_id = 0');
+    $ubRow = $pdo->prepare('SELECT balance FROM user_balances WHERE user_id = 1');
     $ubRow->execute();
     $row = $ubRow->fetch(PDO::FETCH_ASSOC);
     if ($row !== false) {

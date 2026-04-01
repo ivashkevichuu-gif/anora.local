@@ -15,6 +15,10 @@ if (!$user || !password_verify($password, $user['password'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Invalid email or password.']); exit;
 }
+if ((int)$user['is_bot'] === 1) {
+    http_response_code(403);
+    echo json_encode(['error' => 'This account cannot log in.']); exit;
+}
 if (!$user['is_verified']) {
     http_response_code(403);
     echo json_encode(['error' => 'Please verify your email before logging in.']); exit;

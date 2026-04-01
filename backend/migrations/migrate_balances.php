@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/db.php';
 
-define('SYSTEM_USER_ID', 0);
+define('SYSTEM_USER_ID', 1);
 
 echo "=== Balance Migration Start ===\n\n";
 

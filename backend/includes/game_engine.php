@@ -84,6 +84,11 @@ class GameEngine
 
         $amount = (float) $room;
 
+        // Block system account from playing
+        if ($userId === SYSTEM_USER_ID) {
+            throw new InvalidArgumentException('System account cannot place bets.');
+        }
+
         // Auto-generate client seed if missing (mandatory for provably fair entropy)
         if ($clientSeed === '') {
             $bytes = random_bytes(16);

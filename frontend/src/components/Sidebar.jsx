@@ -137,7 +137,7 @@ export default function Sidebar({ open, onClose }) {
 
         <div className="sidebar-footer">
           <div className="text-center" style={{ fontSize: '.7rem', color: 'var(--text-muted)', opacity: 0.5, padding: '8px 0' }}>
-           Build v1.0.0
+           Build v{__BUILD_VERSION__}
           </div>
         </div>
       </aside>

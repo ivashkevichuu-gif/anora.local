@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Bump Build Version",
+  "description": "After editing any source file, increment the patch version in lifecycle.md (e.g. v1.0.0 → v1.0.1) and rebuild the frontend so the sidebar shows the updated version.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": [
+      "write"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A source file was just written. IMPORTANT: If the file that was just written is lifecycle.md, do NOTHING — just respond 'skip' and stop. Otherwise: read the first line of lifecycle.md, extract the current version (e.g. v1.0.5), increment the patch number by 1 (e.g. v1.0.6), and update ONLY the first line of lifecycle.md with the new version. Then run `cmd /c npm run build 2>&1` in the `frontend` directory to rebuild with the new version. Do NOT modify any other files. Keep it quick — just bump and build."
+  }
+}
