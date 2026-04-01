@@ -3,15 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function avatarColor(email) {
+function avatarColor(name) {
   let hash = 0
-  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash)
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   const colors = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2']
   return colors[Math.abs(hash) % colors.length]
 }
 
 function getDisplayName(bet) {
-  return bet.display_name ?? bet.email.split('@')[0]
+  return bet.display_name || bet.email?.split('@')[0] || 'Player'
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -22,21 +22,13 @@ const TILE_STEP   = TILE_W + TILE_GAP   // 90px per slot
 const CONTAINER_W = 400
 const CENTER      = CONTAINER_W / 2     // 200px — gold line
 
-// Winner sits at this index in the strip (deep enough to hide the start)
 const WINNER_IDX  = 150
-const STRIP_LEN   = 200   // total tiles
+const STRIP_LEN   = 200
 
-// Exact translateX so winner tile center aligns with CENTER:
-//   tile[WINNER_IDX] center = WINNER_IDX * TILE_STEP + TILE_W/2
-//   translateX = CENTER - tile_center
 const TARGET_X = CENTER - (WINNER_IDX * TILE_STEP + TILE_W / 2)
-
-const SPIN_MS = 5500   // must match SPIN_DURATION in useGameMachine
+const SPIN_MS = 5500
 
 // ─── Casino easing ────────────────────────────────────────────────────────────
-// Phase 1 (0–20%):  quadratic acceleration
-// Phase 2 (20–80%): linear cruise at full speed
-// Phase 3 (80–100%): cubic deceleration to exact stop
 function easeCasino(t) {
   if (t < 0.2) return 2.5 * t * t
   if (t < 0.8) return 0.1 + (t - 0.2) * 1.333
@@ -45,15 +37,11 @@ function easeCasino(t) {
 }
 
 // ─── Weighted strip builder ───────────────────────────────────────────────────
-// Bets with more total_bet get higher visual frequency in the strip.
-// This makes the reel feel weighted — high-stakers appear more often.
 function buildWeightedStrip(bets, winnerBet, winnerIdx, totalLen) {
   if (!bets.length) return []
 
-  // Weight each bet by their total_bet (more bets = more tiles)
   const totalWeight = bets.reduce((s, b) => s + (b.total_bet ?? 1), 0)
 
-  // Weighted random picker
   function pick() {
     let r = Math.random() * totalWeight
     for (const b of bets) {
@@ -64,12 +52,8 @@ function buildWeightedStrip(bets, winnerBet, winnerIdx, totalLen) {
   }
 
   const strip = Array.from({ length: totalLen }, () => ({ ...pick(), _isWinner: false }))
-
-  // Place winner at exact index
   strip[winnerIdx] = { ...winnerBet, _isWinner: true }
 
-  // Near-miss: place a different player 1 before and 2 after winner
-  // This creates the "so close!" feeling
   const others = bets.filter(b => b.user_id !== winnerBet.user_id)
   if (others.length > 0) {
     const nearMiss = others[Math.floor(Math.random() * others.length)]
@@ -88,20 +72,18 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
   const [flashing, setFlashing] = useState(false)
 
   const rafRef      = useRef(null)
-  const hasSpunRef  = useRef(false)   // spin-once guard
-  const lastXRef    = useRef(0)       // for velocity tracking
+  const hasSpunRef  = useRef(false)
+  const lastXRef    = useRef(0)
   const velocityRef = useRef(0)
 
   const winnerId = winner?.id ?? winner?.user_id ?? null
 
-  // Build the strip once per round (bets + winner change together)
   const tiles = useMemo(() => {
     if (!bets?.length || winnerId == null) return []
     const winnerBet = bets.find(b => b.user_id === winnerId) ?? bets[0]
     return buildWeightedStrip(bets, winnerBet, WINNER_IDX, STRIP_LEN)
   }, [bets, winnerId])
 
-  // Reset guard when new tiles arrive (new round)
   useEffect(() => {
     hasSpunRef.current = false
     lastXRef.current   = 0
@@ -110,7 +92,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
     setBlur(0)
   }, [tiles])
 
-  // ── Spin animation — runs ONCE when phase becomes DRAWING ────────────────
+  // ── Spin animation ────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'DRAWING' || !tiles.length || hasSpunRef.current) return
     hasSpunRef.current = true
@@ -130,12 +112,10 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
       const eased    = easeCasino(progress)
       const currentX = TARGET_X * eased
 
-      // Velocity = pixels moved since last frame → drives motion blur
       const dx = Math.abs(currentX - lastXRef.current)
       velocityRef.current = dx
       lastXRef.current    = currentX
 
-      // Blur proportional to speed, max 8px
       const blurPx = Math.min(dx / 8, 8)
 
       setStripX(currentX)
@@ -144,7 +124,6 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(step)
       } else {
-        // Snap to exact target, clear blur
         setStripX(TARGET_X)
         setBlur(0)
       }
@@ -167,7 +146,8 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
   if (!tiles.length || !winner) return null
   if (phase !== 'DRAWING' && phase !== 'RESULT') return null
 
-  const revealed = phase === 'RESULT'
+  const revealed   = phase === 'RESULT'
+  const winnerName = winner.display_name || winner.email?.split('@')[0] || 'Winner'
 
   return (
     <div className="flex flex-col items-center gap-5 py-2 relative">
@@ -197,7 +177,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
           transition: 'box-shadow 0.5s',
         }}>
 
-        {/* Edge fades — stronger than before for depth */}
+        {/* Edge fades */}
         <div className="absolute inset-y-0 left-0 z-10 pointer-events-none"
           style={{ width: 80, background: 'linear-gradient(to right, rgba(0,0,0,0.9), transparent)' }} />
         <div className="absolute inset-y-0 right-0 z-10 pointer-events-none"
@@ -211,7 +191,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
         <div className="absolute bottom-0 z-20 pointer-events-none"
           style={{ left: CENTER - 7, width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '9px solid var(--neon-gold)' }} />
 
-        {/* Strip — velocity blur applied to whole strip */}
+        {/* Strip */}
         <div style={{
           position: 'absolute', top: 12, left: 0,
           display: 'flex', gap: TILE_GAP,
@@ -235,10 +215,10 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
               }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%',
-                  background: avatarColor(bet.email),
+                  background: avatarColor(name),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 11, fontWeight: 700, color: '#fff',
-                  boxShadow: highlight ? `0 0 12px ${avatarColor(bet.email)}` : 'none',
+                  boxShadow: highlight ? `0 0 12px ${avatarColor(name)}` : 'none',
                   transition: 'box-shadow 0.4s',
                 }}>
                   {name.slice(0, 2).toUpperCase()}
@@ -258,7 +238,7 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
         </div>
       </div>
 
-      {/* Winner reveal card — stays until new round */}
+      {/* Winner reveal card */}
       <AnimatePresence>
         {revealed && (
           <motion.div
@@ -277,16 +257,16 @@ export default function WinnerAnimation({ bets, winner, pot, phase }) {
               transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
               style={{
                 width: 68, height: 68, borderRadius: '50%',
-                background: avatarColor(winner.email),
+                background: avatarColor(winnerName),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 24, fontWeight: 900, color: '#fff',
               }}
             >
-              {(winner.display_name ?? winner.email).slice(0, 2).toUpperCase()}
+              {winnerName.slice(0, 2).toUpperCase()}
             </motion.div>
 
             <div className="text-2xl font-black" style={{ color: 'var(--neon-gold)' }}>
-              {winner.display_name ?? winner.email.split('@')[0]}
+              {winnerName}
             </div>
 
             {pot != null && (

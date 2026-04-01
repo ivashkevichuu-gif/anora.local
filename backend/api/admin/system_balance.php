@@ -9,11 +9,26 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 20;
 $offset = ($page - 1) * $perPage;
 
-// Current system balance
-$balanceRow = $pdo->query('SELECT balance FROM system_balance WHERE id = 1')->fetch();
-$balance = $balanceRow ? (float)$balanceRow['balance'] : 0.00;
+// Try reading System_Account balance from user_balances (SYSTEM_USER_ID = 0)
+$balance = null;
+try {
+    $ubRow = $pdo->prepare('SELECT balance FROM user_balances WHERE user_id = 0');
+    $ubRow->execute();
+    $row = $ubRow->fetch(PDO::FETCH_ASSOC);
+    if ($row !== false) {
+        $balance = (float)$row['balance'];
+    }
+} catch (PDOException $e) {
+    // Table may not exist yet during migration
+}
 
-// Aggregates
+// Fall back to system_balance singleton if user_balances row doesn't exist
+if ($balance === null) {
+    $balanceRow = $pdo->query('SELECT balance FROM system_balance WHERE id = 1')->fetch();
+    $balance = $balanceRow ? (float)$balanceRow['balance'] : 0.00;
+}
+
+// Aggregates from system_transactions (legacy)
 $totals = $pdo->query(
     "SELECT
         SUM(CASE WHEN type = 'commission' THEN amount ELSE 0 END) AS total_commission,

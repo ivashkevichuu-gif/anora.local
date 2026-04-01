@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__ . '/../../includes/cors.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/mailer.php';
+require_once __DIR__ . '/../../includes/nickname.php';
 
 $input    = json_decode(file_get_contents('php://input'), true);
 $email    = trim($input['email'] ?? '');
@@ -93,6 +94,11 @@ if (!$refCodeSet) {
 // Store registration IP (Requirement 12.2)
 $pdo->prepare('UPDATE users SET registration_ip = ? WHERE id = ?')
     ->execute([$ip, $userId]);
+
+// Generate unique nickname at registration
+$nickname = generateUniqueNickname($pdo);
+$pdo->prepare('UPDATE users SET nickname = ? WHERE id = ?')
+    ->execute([$nickname, $userId]);
 
 // Referral code capture and eligibility check (Requirements 11.4-11.6, 12.1-12.6, 20.2-20.4)
 $referralCode = trim($input['referral_code'] ?? '');

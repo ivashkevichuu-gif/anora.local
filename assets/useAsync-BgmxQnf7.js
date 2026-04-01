@@ -1,0 +1,1 @@
+import{r as s}from"./index-CKzUq2om.js";function g(r){const[a,u]=s.useState(!1),[n,t]=s.useState(null),[c,l]=s.useState(null),o=s.useCallback(async(...f)=>{u(!0),t(null),l(null);try{const e=await r(...f);return l(e),e}catch(e){throw t(e.message),e}finally{u(!1)}},[r]),i=s.useCallback(()=>{t(null),l(null)},[]);return{execute:o,loading:a,error:n,success:c,reset:i}}export{g as u};

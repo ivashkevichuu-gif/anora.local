@@ -89,12 +89,17 @@ ALTER TABLE lottery_games
 -- ── Bot liquidity system ──────────────────────────────────────────────────────
 -- BOT: add is_bot flag to users table
 ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS is_bot TINYINT(1) NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS display_name VARCHAR(64) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS is_bot TINYINT(1) NOT NULL DEFAULT 0;
+
+-- NOTE: display_name column is DEPRECATED — use nickname instead.
+-- Bots get their names via the nickname column.
+-- If display_name still exists, migrate data then drop it:
+-- UPDATE users SET nickname = display_name WHERE is_bot = 1 AND nickname IS NULL AND display_name IS NOT NULL;
+-- ALTER TABLE users DROP COLUMN display_name;
 
 -- BOT: bot users (email must be unique — use bot.internal domain)
 -- Balance is topped up automatically by bot_runner.php
-INSERT IGNORE INTO users (email, password, balance, is_verified, is_bot, display_name) VALUES
+INSERT IGNORE INTO users (email, password, balance, is_verified, is_bot, nickname) VALUES
     ('alex@bot.internal',   '$2y$10$unusable_hash_bots_cannot_login', 10000.00, 1, 1, 'Alex'),
     ('chris@bot.internal',  '$2y$10$unusable_hash_bots_cannot_login', 10000.00, 1, 1, 'Chris'),
     ('jordan@bot.internal', '$2y$10$unusable_hash_bots_cannot_login', 10000.00, 1, 1, 'Jordan'),
@@ -229,3 +234,132 @@ CREATE TABLE IF NOT EXISTS registration_attempts (
   created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_ip_created (ip, created_at)
 );
+
+-- ── Nickname system ───────────────────────────────────────────────────────────
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS nickname            VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci UNIQUE DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS nickname_changed_at DATETIME     DEFAULT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_nickname ON users(nickname);
+
+-- ── Crypto Payments ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS crypto_invoices (
+    id                      INT AUTO_INCREMENT PRIMARY KEY,
+    user_id                 INT NOT NULL,
+    nowpayments_invoice_id  VARCHAR(64) DEFAULT NULL,
+    amount_usd              DECIMAL(15,2) NOT NULL,
+    credited_usd            DECIMAL(15,2) DEFAULT NULL,
+    amount_crypto           VARCHAR(64) DEFAULT NULL,
+    currency                VARCHAR(10) DEFAULT NULL,
+    status                  ENUM('pending','waiting','confirming','confirmed','partially_paid','expired','failed')
+                            NOT NULL DEFAULT 'pending',
+    invoice_url             TEXT DEFAULT NULL,
+    created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_nowpayments_invoice_id (nowpayments_invoice_id),
+    INDEX idx_status (status),
+    INDEX idx_user_created (user_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS crypto_payouts (
+    id                      INT AUTO_INCREMENT PRIMARY KEY,
+    user_id                 INT NOT NULL,
+    nowpayments_payout_id   VARCHAR(64) DEFAULT NULL,
+    amount_usd              DECIMAL(15,2) NOT NULL,
+    wallet_address          VARCHAR(255) NOT NULL,
+    currency                VARCHAR(10) NOT NULL,
+    status                  ENUM('pending','awaiting_approval','processing','completed','failed','rejected')
+                            NOT NULL DEFAULT 'pending',
+    created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_nowpayments_payout_id (nowpayments_payout_id),
+    INDEX idx_status (status),
+    INDEX idx_user_date (user_id, created_at)
+);
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS default_crypto_currency VARCHAR(10) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS default_wallet_address  VARCHAR(255) DEFAULT NULL;
+
+-- ── Ledger + Game State Machine ──────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS user_balances (
+    user_id INT NOT NULL PRIMARY KEY,
+    balance DECIMAL(20,8) NOT NULL DEFAULT 0.00000000
+);
+
+CREATE TABLE IF NOT EXISTS ledger_entries (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    type VARCHAR(32) NOT NULL,
+    amount DECIMAL(20,8) NOT NULL,
+    direction ENUM('credit','debit') NOT NULL,
+    balance_after DECIMAL(20,8) NOT NULL,
+    reference_id VARCHAR(64) DEFAULT NULL,
+    reference_type VARCHAR(32) DEFAULT NULL,
+    metadata JSON DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_user_created (user_id, created_at),
+    INDEX idx_reference (reference_type, reference_id),
+    INDEX idx_type (type),
+    UNIQUE KEY uniq_reference (reference_type, reference_id, user_id, type)
+);
+
+CREATE TABLE IF NOT EXISTS game_rounds (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    room TINYINT NOT NULL,
+    status ENUM('waiting','active','spinning','finished') NOT NULL DEFAULT 'waiting',
+    server_seed VARCHAR(64) DEFAULT NULL,
+    server_seed_hash VARCHAR(64) DEFAULT NULL,
+    total_pot DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    winner_id INT DEFAULT NULL,
+    started_at DATETIME DEFAULT NULL,
+    spinning_at DATETIME DEFAULT NULL,
+    finished_at DATETIME DEFAULT NULL,
+    payout_status ENUM('pending','paid') NOT NULL DEFAULT 'pending',
+    payout_id VARCHAR(36) DEFAULT NULL,
+    commission DECIMAL(12,2) DEFAULT NULL,
+    referral_bonus DECIMAL(12,2) DEFAULT NULL,
+    winner_net DECIMAL(12,2) DEFAULT NULL,
+    final_bets_snapshot JSON DEFAULT NULL,
+    final_combined_hash VARCHAR(64) DEFAULT NULL,
+    final_rand_unit DECIMAL(20,12) DEFAULT NULL,
+    final_target DECIMAL(20,12) DEFAULT NULL,
+    final_total_weight DECIMAL(15,2) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (winner_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_room_status (room, status),
+    INDEX idx_status (status),
+    UNIQUE KEY uniq_payout (payout_id)
+);
+
+CREATE TABLE IF NOT EXISTS game_bets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    round_id INT NOT NULL,
+    user_id INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    client_seed VARCHAR(64) DEFAULT NULL,
+    ledger_entry_id INT DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (round_id) REFERENCES game_rounds(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_round_id (round_id),
+    INDEX idx_user_round (user_id, round_id)
+);
+
+-- ── System Account for ledger-based platform accounting ──────────────────────
+-- Ensure sql_mode allows explicit id=0 insert
+SET @old_sql_mode = @@sql_mode;
+SET sql_mode = REPLACE(@@sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '');
+
+INSERT IGNORE INTO users (id, email, password, balance, is_verified, is_bot, nickname)
+VALUES (0, 'system@anora.internal', '$2y$10$unusable_hash_system', 0.00, 1, 1, 'SYSTEM');
+
+INSERT IGNORE INTO user_balances (user_id, balance) VALUES (0, 0.00000000);
+
+SET sql_mode = @old_sql_mode;

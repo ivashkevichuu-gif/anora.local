@@ -1,14 +1,13 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-function avatarColor(email) {
+function avatarColor(name) {
   let hash = 0
-  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash)
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   const colors = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2']
   return colors[Math.abs(hash) % colors.length]
 }
 
-// FIXED: chance progress bar with risk label
 function ChanceBar({ chance }) {
   const pct   = Math.min(100, chance * 100)
   const color = pct > 60 ? '#00ff88' : pct > 30 ? '#f59e0b' : '#a855f7'
@@ -72,9 +71,8 @@ export default function BetsTable({ bets, myUserId }) {
             {bets.map((bet, i) => {
               const isMe  = bet.user_id === myUserId
               const isBot = bet.is_bot
-              const color = avatarColor(bet.email)
-              // BOT: use display_name if available
-              const name  = bet.display_name ?? bet.email.split('@')[0]
+              const name  = bet.display_name || bet.email?.split('@')[0] || 'Player'
+              const color = avatarColor(name)
 
               return (
                 <motion.div
@@ -86,7 +84,6 @@ export default function BetsTable({ bets, myUserId }) {
                   style={{
                     background: isMe ? 'rgba(124,58,237,0.06)' : 'transparent',
                     borderLeft: isMe ? '2px solid rgba(124,58,237,0.5)' : '2px solid transparent',
-                    // BOT: slightly dimmed — natural, not obvious
                     opacity: isBot ? 0.75 : 1,
                   }}
                 >
@@ -113,7 +110,7 @@ export default function BetsTable({ bets, myUserId }) {
                     </span>
                   </div>
 
-                  {/* IMPROVED: win chance progress bar */}
+                  {/* Win chance progress bar */}
                   <ChanceBar chance={bet.chance ?? 0} />
                 </motion.div>
               )

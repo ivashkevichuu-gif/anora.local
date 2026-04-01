@@ -41,6 +41,7 @@ export const api = {
   saveBank:     body => request('/account/bank.php',         { method: 'POST', body: JSON.stringify(body) }),
   transactions:     ()           => request('/account/transactions.php'),
   userTransactions: (page = 1)  => request(`/account/transactions.php?page=${page}`),
+  updateNickname:   body        => request('/account/nickname.php', { method: 'POST', body: JSON.stringify(body) }),
 
   adminLogin:      body => request('/admin/login.php',        { method: 'POST', body: JSON.stringify(body) }),
   adminLogout:     ()   => request('/admin/logout.php',       { method: 'POST' }),
@@ -50,13 +51,32 @@ export const api = {
   adminWithdrawals:()   => request('/admin/withdrawals.php'),
   adminAction:     body => request('/admin/action.php',       { method: 'POST', body: JSON.stringify(body) }),
 
-  // Lottery
+  // Lottery (legacy — kept for backward compatibility)
   lotteryStatus: (room = 1)           => request(`/lottery/status.php?room=${room}`),
   lotteryBet:    (room, clientSeed)   => request('/lottery/bet.php', {
     method: 'POST',
     body: JSON.stringify({ room, client_seed: clientSeed }),
   }),
   lotteryVerify: (gameId)             => request(`/lottery/verify.php?game_id=${gameId}`),
+
+  // Game (new ledger-based system)
+  gameStatus: (room = 1) => request(`/game/status.php?room=${room}`),
+  gameBet: (room, clientSeed) => request('/game/bet.php', {
+    method: 'POST',
+    body: JSON.stringify({ room, client_seed: clientSeed }),
+  }),
+  gameVerify: (gameId) => request(`/game/verify.php?game_id=${gameId}`),
+
+  // Crypto
+  cryptoDeposit:    body         => request('/account/crypto_deposit.php',  { method: 'POST', body: JSON.stringify(body) }),
+  cryptoWithdraw:   body         => request('/account/crypto_withdraw.php', { method: 'POST', body: JSON.stringify(body) }),
+  cryptoInvoices:   (page = 1)   => request(`/account/crypto_invoices.php?page=${page}`),
+  cryptoPayouts:    (page = 1)   => request(`/account/crypto_payouts.php?page=${page}`),
+
+  // Admin crypto
+  adminCryptoInvoices:     (page = 1, status = '') => request(`/admin/crypto_invoices.php?page=${page}&status=${status}`),
+  adminCryptoPayouts:      (page = 1, status = '') => request(`/admin/crypto_payouts.php?page=${page}&status=${status}`),
+  adminCryptoPayoutAction: body                    => request('/admin/crypto_payouts.php', { method: 'POST', body: JSON.stringify(body) }),
 
   // Admin lottery
   adminLotteryGames:   ()             => request('/admin/lottery_games.php'),

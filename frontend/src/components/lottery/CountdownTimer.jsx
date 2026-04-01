@@ -17,13 +17,13 @@ function getGlow(seconds) {
 
 export default function CountdownTimer({ countdown, status }) {
   const color = getColor(countdown)
-  const isActive = status === 'countdown' && countdown !== null
+  const isActive = status === 'active' && countdown !== null
 
   return (
     <div className="flex flex-col items-center gap-2">
       <span className="text-xs font-semibold tracking-widest uppercase"
         style={{ color: 'var(--text-muted)' }}>
-        {status === 'waiting' ? 'Waiting for players' : status === 'finished' ? 'Round ended' : 'Draw in'}
+        {status === 'waiting' ? 'Waiting for players' : status === 'finished' || status === 'spinning' ? 'Round ended' : 'Draw in'}
       </span>
 
       <motion.div
@@ -42,7 +42,7 @@ export default function CountdownTimer({ countdown, status }) {
         }}
       >
         {status === 'waiting'  ? '—'
-         : status === 'finished' ? '✓'
+         : status === 'finished' || status === 'spinning' ? '✓'
          : countdown !== null ? countdown
          : '—'}
       </motion.div>

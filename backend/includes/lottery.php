@@ -314,14 +314,14 @@ function pickWeightedWinner(PDO $pdo, int $gameId, string $serverSeed): array {
 function buildBetList(PDO $pdo, int $gameId, float $totalPot): array {
     $stmt = $pdo->prepare(
         "SELECT lb.user_id, u.email,
-                COALESCE(u.display_name, u.email) AS display_name,
+                COALESCE(u.nickname, u.email) AS display_name,
                 u.is_bot,
                 SUM(lb.amount) AS total_bet,
                 COUNT(lb.id)   AS bet_count
          FROM lottery_bets lb
          JOIN users u ON u.id = lb.user_id
          WHERE lb.game_id = ?
-         GROUP BY lb.user_id, u.email, u.display_name, u.is_bot
+         GROUP BY lb.user_id, u.email, u.nickname, u.is_bot
          ORDER BY total_bet DESC"
     );
     $stmt->execute([$gameId]);
@@ -372,7 +372,7 @@ function getGameState(PDO $pdo, int $room = 1, ?int $currentUserId = null): arra
 
     $winner = null;
     if ($game['winner_id']) {
-        $w = $pdo->prepare("SELECT id, email, display_name, is_bot FROM users WHERE id = ?");
+        $w = $pdo->prepare("SELECT id, email, COALESCE(nickname, email) AS display_name, is_bot FROM users WHERE id = ?");
         $w->execute([$game['winner_id']]);
         $winner = $w->fetch();
         if ($winner) {
@@ -771,7 +771,7 @@ function placeBet(PDO $pdo, int $userId, int $room = 1, string $clientSeed = '')
 // ─────────────────────────────────────────────────────────────────────────────
 function getLastFinishedGame(PDO $pdo, int $room = 1): ?array {
     $stmt = $pdo->prepare(
-        "SELECT g.*, u.email AS winner_email, u.display_name AS winner_display_name, u.is_bot AS winner_is_bot
+        "SELECT g.*, u.email AS winner_email, COALESCE(u.nickname, u.email) AS winner_display_name, u.is_bot AS winner_is_bot
          FROM lottery_games g
          LEFT JOIN users u ON u.id = g.winner_id
          WHERE g.status = 'finished' AND g.room = ?
@@ -804,7 +804,7 @@ function getLastFinishedGame(PDO $pdo, int $room = 1): ?array {
 // ─────────────────────────────────────────────────────────────────────────────
 function getVerifyData(PDO $pdo, int $gameId): array {
     $stmt = $pdo->prepare(
-        "SELECT g.*, u.email AS winner_email
+        "SELECT g.*, COALESCE(u.nickname, u.email) AS winner_nickname
          FROM lottery_games g
          LEFT JOIN users u ON u.id = g.winner_id
          WHERE g.id = ?"
@@ -827,7 +827,7 @@ function getVerifyData(PDO $pdo, int $gameId): array {
     } else {
         // Legacy fallback: re-derive from live bets (games before snapshot feature)
         $betStmt = $pdo->prepare(
-            "SELECT lb.id AS bet_id, lb.user_id, u.email,
+            "SELECT lb.id AS bet_id, lb.user_id, COALESCE(u.nickname, 'Player') AS nickname,
                     lb.amount, COALESCE(lb.client_seed,'') AS client_seed
              FROM lottery_bets lb JOIN users u ON u.id = lb.user_id
              WHERE lb.game_id = ? ORDER BY lb.id ASC"
@@ -870,13 +870,19 @@ function getVerifyData(PDO $pdo, int $gameId): array {
     $cumArr      = array_column($cumulativeWeights, 'cumulative');
     $winnerIndex = lowerBound($cumArr, $target);
 
+    // Strip email from snapshot bet rows (privacy)
+    $sanitizedBetRows = array_map(function ($row) {
+        unset($row['email']);
+        return $row;
+    }, $betRows);
+
     return [
         'game_id'            => (int)$gameId,
         'status'             => $game['status'],
         'server_seed'        => $serverSeed,
         'server_seed_hash'   => $game['server_seed_hash'],
         'hash_format'        => LOTTERY_HASH_FORMAT,
-        'client_seeds'       => $betRows,
+        'client_seeds'       => $sanitizedBetRows,
         'combined_hash'      => $combined,
         'rand_unit'          => $randUnit,
         'target'             => $target,
@@ -884,7 +890,7 @@ function getVerifyData(PDO $pdo, int $gameId): array {
         'cumulative_weights' => $cumulativeWeights,
         'winner_index'       => $winnerIndex,
         'winner_id'          => (int)$game['winner_id'],
-        'winner_email'       => $game['winner_email'],
+        'winner_nickname'    => $game['winner_nickname'],
         'total_pot'          => (float)$game['total_pot'],
         'finished_at'        => $game['finished_at'],
         'snapshot_used'      => !empty($game['final_bets_snapshot']),

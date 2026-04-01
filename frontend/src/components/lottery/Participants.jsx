@@ -1,18 +1,15 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-function avatarColor(email) {
+function avatarColor(name) {
   let hash = 0
-  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash)
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   const colors = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2']
   return colors[Math.abs(hash) % colors.length]
 }
 
-// BOT: get display name — use display_name if set, else email prefix
 function displayName(bet) {
-  return bet.display_name
-    ? bet.display_name
-    : bet.email.split('@')[0]
+  return bet.display_name || bet.email?.split('@')[0] || 'Player'
 }
 
 export default function Participants({ bets, myUserId }) {
@@ -32,9 +29,9 @@ export default function Participants({ bets, myUserId }) {
         {bets.map((bet, i) => {
           const isMe   = bet.user_id === myUserId
           const isBot  = bet.is_bot
-          const color  = avatarColor(bet.email)
-          const staked = bet.total_bet ?? bet.amount ?? 1
           const name   = displayName(bet)
+          const color  = avatarColor(name)
+          const staked = bet.total_bet ?? bet.amount ?? 1
 
           return (
             <motion.div
@@ -47,7 +44,6 @@ export default function Participants({ bets, myUserId }) {
               style={{
                 minWidth: 60,
                 marginTop: 7,
-                // BOT: slightly dimmed — natural, not obvious
                 opacity: isBot ? 0.75 : 1,
               }}
             >

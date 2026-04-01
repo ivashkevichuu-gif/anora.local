@@ -1,0 +1,224 @@
+# Implementation Plan: Crypto Payments
+
+## Overview
+
+Integrate cryptocurrency deposits and withdrawals into the anora.bet platform via NOWPayments API. Implementation follows a bottom-up approach: database schema first, then backend services, webhook handler, API endpoints, frontend components, admin panel, and finally cron cleanup. Each task builds on the previous and is independently testable.
+
+## Tasks
+
+- [x] 1. Database migrations for crypto payments
+  - [x] 1.1 Create `crypto_invoices` and `crypto_payouts` tables and alter `users` table
+    - Append to `database.sql` the DDL for `crypto_invoices` table with all columns: `id`, `user_id` (FK → users.id), `nowpayments_invoice_id`, `amount_usd`, `credited_usd`, `amount_crypto`, `currency`, `status` ENUM('pending','waiting','confirming','confirmed','partially_paid','expired','failed'), `invoice_url`, `created_at`, `updated_at`
+    - Append DDL for `crypto_payouts` table with all columns: `id`, `user_id` (FK → users.id), `nowpayments_payout_id`, `amount_usd`, `wallet_address`, `currency`, `status` ENUM('pending','awaiting_approval','processing','completed','failed','rejected'), `created_at`, `updated_at`
+    - Add indexes: `idx_user_id`, `idx_nowpayments_invoice_id`, `idx_status`, `idx_user_created` on `crypto_invoices`; `idx_user_id`, `idx_nowpayments_payout_id`, `idx_status`, `idx_user_date` on `crypto_payouts`
+    - ALTER `users` table to add `default_crypto_currency VARCHAR(10) DEFAULT NULL` and `default_wallet_address VARCHAR(255) DEFAULT NULL` using `ADD COLUMN IF NOT EXISTS`
+    - Use `CREATE TABLE IF NOT EXISTS` for safe idempotent migrations
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 16.4_
+
+- [x] 2. NOWPayments configuration and API client
+  - [x] 2.1 Create `backend/config/nowpayments.php` configuration file
+    - Return associative array with keys: `api_key`, `ipn_secret`, `api_base_url`, `sandbox_mode`, `manual_approval_threshold`
+    - Default `api_base_url` to `https://api.nowpayments.io/v1`, `manual_approval_threshold` to `500.00`
+    - _Requirements: 1.1_
+  - [x] 2.2 Implement `NowPaymentsClient` class in `backend/includes/nowpayments.php`
+    - Implement constructor accepting config array, storing `apiKey`, `baseUrl`, `timeout` (30s)
+    - Implement `createInvoice(float $priceAmount, string $priceCurrency = 'usd'): array` — POST `/v1/invoice`
+    - Implement `createPayout(float $amount, string $address, string $currency): array` — POST `/v1/payout`
+    - Implement `getPaymentStatus(string $paymentId): array` — GET `/v1/payment/{id}`
+    - Implement private `request(string $method, string $endpoint, array $data = []): array` — sets `x-api-key` header, 30s timeout via cURL, throws `NowPaymentsException` on non-2xx or network error
+    - Implement `NowPaymentsException` extending `\RuntimeException` with `httpStatus` and `responseBody` properties
+    - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6_
+  - [ ]* 2.3 Write property test for HTTP error normalization (Property 16)
+    - **Property 16: HTTP Client Error Normalization**
+    - **Validates: Requirements 1.4**
+    - File: `backend/tests/NowPaymentsClientPropertyTest.php`
+
+- [x] 3. Backend services — InvoiceService and PayoutService
+  - [x] 3.1 Implement `InvoiceService` class in `backend/includes/invoice_service.php`
+    - Constructor accepts `PDO`, `NowPaymentsClient`, config array
+    - Implement `createInvoice(int $userId, float $amountUsd): array`
+    - Validate amount >= $1.00, reject with descriptive error if below
+    - Check rate limit: count `crypto_invoices` for user in last 60 minutes, reject if >= 5
+    - Call `NowPaymentsClient::createInvoice()`, insert `crypto_invoices` row with status='pending'
+    - Return `['invoice_id' => int, 'invoice_url' => string]`
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 9.1, 9.2, 9.3_
+  - [ ]* 3.2 Write property tests for InvoiceService (Properties 2, 3, 4)
+    - **Property 2: Invoice Creation Produces Correct Record**
+    - **Property 3: Deposit Minimum Amount Rejection**
+    - **Property 4: Deposit Rate Limit Enforcement**
+    - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 9.1, 9.2**
+    - File: `backend/tests/InvoiceServicePropertyTest.php`
+  - [x] 3.3 Implement `PayoutService` class in `backend/includes/payout_service.php`
+    - Constructor accepts `PDO`, `NowPaymentsClient`, config array
+    - Implement `createPayout(int $userId, float $amountUsd, string $walletAddress, string $currency): array`
+    - Validate: amount >= $5, daily cap <= $10k (sum of non-failed payouts today), rate <= 3/day, balance sufficient
+    - Atomic transaction: deduct balance (FOR UPDATE), insert `crypto_payouts`, insert `user_transactions` (type='crypto_withdrawal')
+    - If amount > manual_approval_threshold: set status='awaiting_approval', skip API call
+    - Otherwise: call `NowPaymentsClient::createPayout()`, update `nowpayments_payout_id` and status='processing'
+    - On API failure: immediate refund within transaction (update status='failed', credit balance, insert refund user_transaction)
+    - Update user's `default_wallet_address` and `default_crypto_currency`
+    - Implement `approvePayout(int $payoutId): array` — admin approves, calls NOWPayments API
+    - Implement `rejectPayout(int $payoutId): array` — admin rejects, refunds balance atomically
+    - Implement `refundPayout(int $payoutId): void` — shared refund logic for webhook and API failure paths
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.5, 10.1, 10.2, 10.3, 10.4, 10.5, 16.1, 16.2, 16.3, 17.1_
+  - [ ]* 3.4 Write property tests for PayoutService (Properties 8, 9, 12, 13)
+    - **Property 8: Withdrawal Validation Rejects Invalid Requests**
+    - **Property 9: Withdrawal Atomically Deducts Balance and Creates Records**
+    - **Property 12: Manual Approval Threshold Routing**
+    - **Property 13: User Crypto Preferences Updated on Withdrawal**
+    - **Validates: Requirements 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 10.1, 10.2, 10.3, 10.4, 10.5, 16.1, 17.1, 20.2**
+    - File: `backend/tests/PayoutServicePropertyTest.php`
+
+- [x] 4. Checkpoint — Verify core backend services
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Webhook handler
+  - [x] 5.1 Implement `WebhookHandler` class in `backend/includes/webhook_handler.php`
+    - Constructor accepts `PDO` and `ipnSecret` string
+    - Implement `validateSignature(string $rawBody, string $signatureHeader): bool` — recursively sort payload keys, JSON-encode, compute `hash_hmac('sha512', ...)`, compare with `hash_equals()`
+    - Implement `handle(string $rawBody, string $signatureHeader): array` — validate signature, decode payload, route to deposit or payout handler
+    - Implement `handleDeposit(array $payload): array` — process invoice status updates:
+      - `finished`: within transaction, update crypto_invoices to 'confirmed', credit balance with `min(outcome_amount, price_amount)`, set `credited_usd`, insert user_transactions (type='crypto_deposit', note=payment_id)
+      - `waiting`/`confirming`/`sending`: update status only
+      - `partially_paid`/`expired`/`failed`: update status only
+      - Idempotent: skip if already 'confirmed'
+      - Overpayment: cap credit at original `price_amount`, log warning
+    - Implement `handlePayout(array $payload): array` — process payout status updates:
+      - `finished`: update crypto_payouts to 'completed'
+      - `failed`/`expired`: within transaction, update to 'failed', refund balance, insert user_transactions (type='crypto_withdrawal_refund')
+      - Idempotent: skip if already 'completed'/'failed'/'rejected'
+    - Implement `sortPayload(array $data): array` — recursive key sort
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 8.1, 8.2, 8.3, 8.4, 8.5, 20.1, 20.3, 20.4_
+  - [ ]* 5.2 Write property test for HMAC signature round-trip (Property 1)
+    - **Property 1: HMAC Signature Round-Trip**
+    - **Validates: Requirements 3.1, 3.2, 6.1, 8.1, 8.4**
+    - File: `backend/tests/WebhookSignaturePropertyTest.php`
+  - [ ]* 5.3 Write property tests for deposit webhook (Properties 5, 6, 7)
+    - **Property 5: Deposit Confirmation Credits Correct Amount**
+    - **Property 6: Non-Finished Webhook Statuses Do Not Credit Balance**
+    - **Property 7: Deposit Webhook Idempotency**
+    - **Validates: Requirements 3.3, 3.4, 3.5, 3.6, 4.1, 4.2, 4.3, 4.4, 20.1**
+    - File: `backend/tests/DepositWebhookPropertyTest.php`
+  - [ ]* 5.4 Write property tests for payout refund and idempotency (Properties 10, 11)
+    - **Property 10: Payout Failure Refund Conserves Balance**
+    - **Property 11: Payout Webhook Idempotency**
+    - **Validates: Requirements 6.3, 6.4, 6.5, 16.3, 20.3**
+    - File: `backend/tests/PayoutRefundPropertyTest.php`
+
+- [x] 6. API endpoints
+  - [x] 6.1 Create `backend/api/account/crypto_deposit.php`
+    - Require login via `requireLogin()`, parse JSON input, validate amount
+    - Instantiate `InvoiceService` with PDO, `NowPaymentsClient`, config
+    - Call `createInvoice()`, return JSON `{ invoice_id, invoice_url }` on success
+    - Handle errors: 400 for validation, 429 for rate limit, 502 for API errors
+    - _Requirements: 18.1, 18.9_
+  - [x] 6.2 Create `backend/api/account/crypto_withdraw.php`
+    - Require login, parse JSON input (amount, wallet_address, currency)
+    - Instantiate `PayoutService`, call `createPayout()`
+    - Return JSON `{ payout_id, status, message }` on success
+    - Handle errors: 400 for validation, 429 for rate limit
+    - _Requirements: 18.2, 18.9_
+  - [x] 6.3 Create `backend/api/account/crypto_invoices.php`
+    - Require login, query `crypto_invoices` for current user with pagination
+    - Return JSON paginated list with invoice details
+    - _Requirements: 18.3, 18.9_
+  - [x] 6.4 Create `backend/api/account/crypto_payouts.php`
+    - Require login, query `crypto_payouts` for current user with pagination
+    - Return JSON paginated list with payout details
+    - _Requirements: 18.4, 18.9_
+  - [x] 6.5 Create `backend/api/webhook/nowpayments.php`
+    - Public endpoint (no session), read raw body via `file_get_contents('php://input')`
+    - Instantiate `WebhookHandler`, call `handle()` with raw body and signature header
+    - Return HTTP 200 on success, HTTP 400 on signature failure
+    - _Requirements: 18.5, 8.5_
+  - [x] 6.6 Create `backend/api/admin/crypto_invoices.php`
+    - Require admin session, query all `crypto_invoices` with pagination and optional status filter
+    - Join with `users` table to include user email
+    - Return JSON paginated list
+    - _Requirements: 18.6, 18.10_
+  - [x] 6.7 Create `backend/api/admin/crypto_payouts.php`
+    - Require admin session
+    - GET: query all `crypto_payouts` with pagination and optional status filter, join with users for email
+    - POST: accept `{ action: "approve"|"reject", payout_id }`, call `PayoutService::approvePayout()` or `rejectPayout()`
+    - _Requirements: 18.7, 18.8, 18.10_
+  - [x] 6.8 Update `backend/api/auth/me.php` to include crypto preferences
+    - Add `default_wallet_address` and `default_crypto_currency` to the SELECT query and JSON response
+    - _Requirements: 17.2_
+
+- [x] 7. Checkpoint — Verify all backend endpoints
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 8. Frontend crypto deposit and withdrawal components
+  - [x] 8.1 Create `frontend/src/components/account/CryptoDepositForm.jsx`
+    - Amount input (USD) with "Create Invoice" button
+    - Call `POST /backend/api/account/crypto_deposit.php` on submit
+    - On success: display invoice URL as a link / redirect to NOWPayments hosted page
+    - Display rate limit errors (HTTP 429) and validation errors (HTTP 400)
+    - Show list of recent crypto invoices with status badges (fetch from `crypto_invoices.php`)
+    - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
+  - [x] 8.2 Create `frontend/src/components/account/CryptoWithdrawForm.jsx`
+    - Input fields: amount (USD), wallet address, cryptocurrency dropdown (btc, eth, ltc, usdt, etc.)
+    - Pre-fill wallet address and currency from user's saved defaults (`default_wallet_address`, `default_crypto_currency`)
+    - Call `POST /backend/api/account/crypto_withdraw.php` on submit
+    - Display confirmation with pending payout status on success
+    - Display validation errors (400) and rate limit errors (429)
+    - Show list of recent crypto payouts with status badges (fetch from `crypto_payouts.php`)
+    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
+  - [x] 8.3 Add crypto tabs to `frontend/src/pages/Account.jsx`
+    - Add `{ id: 'crypto-deposit', icon: 'currency-bitcoin', label: 'Crypto Deposit' }` and `{ id: 'crypto-withdraw', icon: 'wallet2', label: 'Crypto Withdraw' }` to TABS array
+    - Import and render `CryptoDepositForm` and `CryptoWithdrawForm` for the new tabs
+    - _Requirements: 11.1, 12.1_
+  - [x] 8.4 Add API methods to `frontend/src/api/client.js`
+    - Add `cryptoDeposit`, `cryptoWithdraw`, `cryptoInvoices`, `cryptoPayouts` methods
+    - Add `adminCryptoInvoices`, `adminCryptoPayouts`, `adminCryptoPayoutAction` methods
+    - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.6, 18.7, 18.8_
+  - [x] 8.5 Update transaction history to show crypto transaction types
+    - In `UserTransactions` component (Account.jsx) or `TxHistory.jsx`, add badge colors for `crypto_deposit` (orange), `crypto_withdrawal` (blue), `crypto_withdrawal_refund` (yellow)
+    - Display crypto currency info from note field when available
+    - _Requirements: 13.1, 13.2, 13.3_
+
+- [x] 9. Admin panel for crypto invoices and payouts
+  - [x] 9.1 Create `frontend/src/pages/admin/CryptoInvoices.jsx`
+    - Paginated table: id, user email, amount_usd, credited_usd, currency, status, nowpayments_invoice_id, created_at
+    - Status filter dropdown (pending, confirming, confirmed, expired, failed)
+    - Fetch from `GET /backend/api/admin/crypto_invoices.php`
+    - _Requirements: 14.1, 14.2, 14.3, 14.4_
+  - [x] 9.2 Create `frontend/src/pages/admin/CryptoPayouts.jsx`
+    - Paginated table: id, user email, amount_usd, wallet_address, currency, status, nowpayments_payout_id, created_at
+    - Status filter dropdown (pending, awaiting_approval, processing, completed, failed, rejected)
+    - Approve/Reject action buttons for payouts with status 'awaiting_approval'
+    - Fetch from `GET /backend/api/admin/crypto_payouts.php`, actions via `POST`
+    - _Requirements: 15.1, 15.2, 15.3, 15.4, 16.2, 16.3_
+  - [x] 9.3 Wire admin pages into `AdminLayout.jsx` and routing
+    - Add NavLink entries for "Crypto Invoices" and "Crypto Payouts" in the sidebar
+    - Add Route entries for `/admin/crypto-invoices` and `/admin/crypto-payouts`
+    - Import `CryptoInvoices` and `CryptoPayouts` components
+    - _Requirements: 14.1, 15.1_
+
+- [x] 10. Expired invoice cleanup in cron
+  - [x] 10.1 Add crypto invoice cleanup to `backend/cron/cleanup.php`
+    - UPDATE `crypto_invoices` SET `status = 'expired'` WHERE `status = 'pending'` AND `created_at < NOW() - INTERVAL 24 HOUR`
+    - Log `[Cleanup] Expired {N} stale crypto invoices`
+    - _Requirements: 19.1, 19.2, 19.3_
+  - [ ]* 10.2 Write property test for stale invoice cleanup (Property 14)
+    - **Property 14: Stale Invoice Cleanup**
+    - **Validates: Requirements 19.1**
+    - File: `backend/tests/InvoiceCleanupPropertyTest.php`
+
+- [ ]* 11. Write property test for audit trail notes (Property 15)
+  - **Property 15: Audit Trail Note Contains NOWPayments ID**
+  - **Validates: Requirements 20.4**
+  - File: `backend/tests/AuditTrailPropertyTest.php`
+
+- [x] 12. Final checkpoint — Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Notes
+
+- Tasks marked with `*` are optional and can be skipped for faster MVP
+- Each task references specific requirements for traceability
+- Checkpoints ensure incremental validation
+- Property tests validate universal correctness properties from the design document
+- Unit tests validate specific examples and edge cases
+- The webhook handler (task 5) is prioritized right after core services since it's the critical path for payment confirmation
+- All database operations use InnoDB transactions with `FOR UPDATE` locking as specified in the design

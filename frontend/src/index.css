@@ -117,9 +117,9 @@ body {
 .nav-tabs .nav-link { color: var(--text-muted); border: none; border-radius: var(--radius-sm) var(--radius-sm) 0 0; padding: 8px 16px; font-size: .88rem; background: none; }
 .nav-tabs .nav-link:hover { color: var(--text); background: var(--accent-hover); }
 .nav-tabs .nav-link.active { color: var(--accent); background: var(--accent-dim); border-bottom: 2px solid var(--accent); }
-.table { color: var(--text); --bs-table-bg: transparent; --bs-table-hover-bg: rgba(255,255,255,.03); }
+.table { color: var(--text); --bs-table-bg: transparent; --bs-table-hover-bg: rgba(255,255,255,.03); --bs-emphasis-color: var(--text); --bs-table-color: var(--text); --bs-table-striped-color: var(--text); }
 .table thead th { background: var(--bg-elevated); color: var(--text-muted); font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; border-color: var(--border); }
-.table td { border-color: var(--border); vertical-align: middle; }
+.table td { border-color: var(--border); vertical-align: middle; color: var(--text); }
 .badge-pending   { background: rgba(255,193,7,.15);  color: #ffc107; }
 .badge-approved  { background: rgba(25,135,84,.15);  color: #2ecc71; }
 .badge-rejected  { background: rgba(220,53,69,.15);  color: #e74c3c; }

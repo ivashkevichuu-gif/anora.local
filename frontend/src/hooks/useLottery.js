@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api/client'
 
-// FIXED: generate a fresh client_seed per bet (not per session)
+// Generate a fresh client_seed per bet
 // Uses 4 × uint32 for 128 bits of entropy, formatted as dash-separated decimals
 function generateClientSeed() {
   const arr = new Uint32Array(4)
@@ -16,7 +16,6 @@ export function useLottery(onBalanceUpdate, room = 1) {
   const [balance, setBalance]     = useState(null)
   const [betting, setBetting]     = useState(false)
   const [betError, setBetError]   = useState(null)
-  // FIXED: track the seed used for the last bet (for display/audit)
   const [lastClientSeed, setLastClientSeed] = useState(() => generateClientSeed())
 
   const intervalRef   = useRef(null)
@@ -31,18 +30,83 @@ export function useLottery(onBalanceUpdate, room = 1) {
     setBetError(null)
   }, [room])
 
+  // Map the status endpoint response shape to the state used by components
+  // status.php returns: { game: {round_id, status, ...}, bets, stats, my_stats, previous, balance }
+  const mapStatusResponse = useCallback((d) => {
+    const game = d.game ? {
+      round_id:         d.game.round_id,
+      status:           d.game.status,
+      total_pot:        d.game.total_pot,
+      countdown:        d.game.countdown,
+      winner:           d.game.winner,
+      server_seed_hash: d.game.server_seed_hash,
+      server_seed:      d.game.server_seed,
+      room:             d.game.room,
+    } : null
+
+    return {
+      game,
+      bets:     d.bets ?? [],
+      stats:    d.stats ?? { unique_players: 0, total_bets: 0 },
+      my_stats: d.my_stats ?? null,
+    }
+  }, [])
+
+  // Map the bet endpoint response shape (raw getGameState result)
+  // bet.php returns: { ok, state: { round, bets, unique_players, total_bets, my_stats, previous }, balance }
+  const mapBetResponse = useCallback((raw) => {
+    const game = raw.round ? {
+      round_id:         raw.round.round_id,
+      status:           raw.round.status,
+      total_pot:        raw.round.total_pot,
+      countdown:        raw.round.countdown,
+      winner:           raw.round.winner,
+      server_seed_hash: raw.round.server_seed_hash,
+      server_seed:      raw.round.server_seed,
+      room:             raw.round.room,
+    } : null
+
+    return {
+      game,
+      bets:     raw.bets ?? [],
+      stats:    { unique_players: raw.unique_players ?? 0, total_bets: raw.total_bets ?? 0 },
+      my_stats: raw.my_stats ?? null,
+    }
+  }, [])
+
   const fetchStatus = useCallback(async () => {
     try {
-      const d = await api.lotteryStatus(room)
-      setState(d.current)
-      setPrevious(d.previous)
-      setUserId(d.user_id != null ? Number(d.user_id) : null)
+      const d = await api.gameStatus(room)
+      const mapped = mapStatusResponse(d)
+      setState(mapped)
+      setPrevious(d.previous ?? null)
+
+      // Extract userId from my_stats presence or balance
       if (d.balance != null) {
+        setUserId(prev => prev) // keep existing userId
         setBalance(d.balance)
         onBalanceRef.current?.(d.balance)
       }
+
+      // Try to get userId from auth context (me endpoint sets it)
+      // The status endpoint doesn't return user_id directly,
+      // but if my_stats is non-null, the user is logged in
+      if (d.my_stats !== null && d.my_stats !== undefined) {
+        // User is authenticated — userId is set via auth context
+      }
     } catch { /* silent */ }
-  }, [room])
+  }, [room, mapStatusResponse])
+
+  useEffect(() => {
+    // Also fetch the user's identity on mount
+    const initUser = async () => {
+      try {
+        const me = await api.me()
+        if (me?.user?.id) setUserId(Number(me.user.id))
+      } catch { /* not logged in */ }
+    }
+    initUser()
+  }, [])
 
   useEffect(() => {
     fetchStatus()
@@ -56,13 +120,17 @@ export function useLottery(onBalanceUpdate, room = 1) {
     setBetError(null)
     setBetting(true)
 
-    // FIXED: generate a fresh seed for each individual bet
+    // Generate a fresh seed for each individual bet
     const seed = generateClientSeed()
     setLastClientSeed(seed)
 
     try {
-      const d = await api.lotteryBet(room, seed)
-      setState(d.state)
+      const d = await api.gameBet(room, seed)
+      // The bet response returns { ok, state: <raw getGameState>, balance }
+      if (d.state) {
+        const mapped = mapBetResponse(d.state)
+        setState(mapped)
+      }
       if (d.balance != null) {
         setBalance(d.balance)
         onBalanceRef.current?.(d.balance)
@@ -73,10 +141,10 @@ export function useLottery(onBalanceUpdate, room = 1) {
       setBetting(false)
       pendingBetRef.current = false
     }
-  }, [room])
+  }, [room, mapBetResponse])
 
   return {
     state, previous, userId, balance, betting, betError, placeBet,
-    clientSeed: lastClientSeed,  // seed used for the most recent bet
+    clientSeed: lastClientSeed,
   }
 }

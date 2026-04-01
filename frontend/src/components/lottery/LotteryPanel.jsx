@@ -34,7 +34,7 @@ export default function LotteryPanel({ room = 1 }) {
   const prevCountRef = useRef(null)
   useEffect(() => {
     const cd = lotteryState?.game?.countdown
-    if (machine.phase === 'BETTING' && cd !== null && cd <= 5 && cd > 0 && cd !== prevCountRef.current) {
+    if ((machine.phase === 'BETTING' || machine.phase === 'COUNTDOWN') && cd !== null && cd <= 5 && cd > 0 && cd !== prevCountRef.current) {
       play('tick')
     }
     prevCountRef.current = cd
@@ -50,15 +50,18 @@ export default function LotteryPanel({ room = 1 }) {
   const bets    = machine.phase === 'BETTING' ? (lotteryState?.bets ?? []) : machine.bets
   const myStats = lotteryState?.my_stats
 
-  // Betting allowed only in BETTING phase (not COUNTDOWN, DRAWING, or RESULT)
-  const canBet = !!userId && machine.phase === 'BETTING'
+  // Betting allowed in BETTING and COUNTDOWN phases (backend accepts bets in waiting/active)
+  const canBet = !!userId
+    && (machine.phase === 'BETTING' || machine.phase === 'COUNTDOWN')
+    && game?.status !== 'spinning'
+    && game?.status !== 'finished'
 
   // UI freeze overlay: show when in DRAWING or RESULT phase
   const uiLocked = machine.phase === 'DRAWING' || machine.phase === 'RESULT'
 
-  const statusColor  = game?.status === 'countdown' ? 'rgba(0,255,136,0.1)'  : game?.status === 'finished' ? 'rgba(239,68,68,0.1)'  : 'rgba(255,255,255,0.05)'
-  const statusBorder = game?.status === 'countdown' ? 'rgba(0,255,136,0.3)'  : game?.status === 'finished' ? 'rgba(239,68,68,0.3)'  : 'rgba(255,255,255,0.1)'
-  const statusText   = game?.status === 'countdown' ? 'var(--neon-green)'    : game?.status === 'finished' ? '#ef4444'               : 'var(--text-muted)'
+  const statusColor  = game?.status === 'active' ? 'rgba(0,255,136,0.1)'  : game?.status === 'finished' ? 'rgba(239,68,68,0.1)'  : 'rgba(255,255,255,0.05)'
+  const statusBorder = game?.status === 'active' ? 'rgba(0,255,136,0.3)'  : game?.status === 'finished' ? 'rgba(239,68,68,0.3)'  : 'rgba(255,255,255,0.1)'
+  const statusText   = game?.status === 'active' ? 'var(--neon-green)'    : game?.status === 'finished' ? '#ef4444'               : 'var(--text-muted)'
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto">
@@ -100,10 +103,11 @@ export default function LotteryPanel({ room = 1 }) {
           <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold"
             style={{ background: statusColor, border: `1px solid ${statusBorder}`, color: statusText }}>
             <span className="w-1.5 h-1.5 rounded-full inline-block"
-              style={{ background: statusText, boxShadow: game?.status === 'countdown' ? '0 0 6px var(--neon-green)' : 'none' }} />
-            {machine.phase === 'RESULT'   ? 'Round finished'
-           : game?.status === 'waiting'   ? 'Waiting for players'
-           : game?.status === 'countdown' ? 'Round in progress'
+              style={{ background: statusText, boxShadow: game?.status === 'active' ? '0 0 6px var(--neon-green)' : 'none' }} />
+            {machine.phase === 'RESULT'  ? 'Round finished'
+           : game?.status === 'waiting'  ? 'Waiting for players'
+           : game?.status === 'active'   ? 'Round in progress'
+           : game?.status === 'spinning' ? 'Drawing winner…'
            : 'Round finished'}
           </div>
 
@@ -131,7 +135,7 @@ export default function LotteryPanel({ room = 1 }) {
         </div>
 
         {/* My stats */}
-        {userId && myStats && myStats.total_bets > 0 && machine.phase === 'BETTING' && (
+        {userId && myStats && myStats.total_bets > 0 && (machine.phase === 'BETTING' || machine.phase === 'COUNTDOWN') && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             className="w-full px-5 py-3 rounded-xl"
@@ -189,12 +193,12 @@ export default function LotteryPanel({ room = 1 }) {
               <i className="bi bi-shield-check"></i>
               Provably Fair · Verifiable
             </span>
-            {game?.id && (
-              <a href={`/backend/api/lottery/verify.php?game_id=${game.id}`} target="_blank" rel="noreferrer"
+            {game?.round_id && (
+              <a href={`/backend/api/game/verify.php?game_id=${game.round_id}`} target="_blank" rel="noreferrer"
                 className="text-xs flex items-center gap-1"
                 style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>
                 <i className="bi bi-box-arrow-up-right"></i>
-                Verify #{game.id}
+                Verify #{game.round_id}
               </a>
             )}
           </div>
@@ -208,7 +212,6 @@ export default function LotteryPanel({ room = 1 }) {
       </motion.div>
 
       {/* ── Winner animation — persistent, state-driven ── */}
-      {/* Shown in DRAWING and RESULT. Collapses only when machine returns to BETTING (new round). */}
       <AnimatePresence>
         {(machine.phase === 'DRAWING' || machine.phase === 'RESULT') && (
           <motion.div

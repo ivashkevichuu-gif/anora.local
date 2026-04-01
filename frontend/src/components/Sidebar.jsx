@@ -69,7 +69,7 @@ export default function Sidebar({ open, onClose }) {
               >
                 <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
                   <i className="bi bi-person-circle me-1"></i>
-                  {user.email.split('@')[0]}
+                  {user.nickname ?? user.email.split('@')[0]}
                 </div>
                 <div className="flex items-baseline gap-1">
                   <AnimatePresence mode="wait">

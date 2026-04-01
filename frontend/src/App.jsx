@@ -16,7 +16,6 @@ const Account     = lazy(() => import('./pages/Account'))
 const About       = lazy(() => import('./pages/About'))
 const AdminLogin      = lazy(() => import('./pages/admin/AdminLogin'))
 const AdminLayout     = lazy(() => import('./components/AdminLayout'))
-const SystemBalance   = lazy(() => import('./pages/admin/SystemBalance'))
 
 export default function App() {
   useEffect(() => {
@@ -52,9 +51,6 @@ export default function App() {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/*"     element={
               <AdminRoute><AdminLayout /></AdminRoute>
-            } />
-            <Route path="/admin/system-balance" element={
-              <AdminRoute><SystemBalance /></AdminRoute>
             } />
 
             <Route path="*" element={<Navigate to="/" replace />} />

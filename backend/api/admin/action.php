@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__ . '/../../includes/cors.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/ledger_service.php';
 requireAdmin();
 
 $input  = json_decode(file_get_contents('php://input'), true);
@@ -27,7 +28,18 @@ try {
         $pdo->prepare('UPDATE withdrawal_requests SET status = "approved" WHERE id = ?')->execute([$id]);
         $pdo->prepare('UPDATE transactions SET status = "approved" WHERE id = ?')->execute([$req['transaction_id']]);
     } else {
-        $pdo->prepare('UPDATE users SET balance = balance + ? WHERE id = ?')->execute([$req['amount'], $req['user_id']]);
+        // Use LedgerService for balance refund instead of direct SQL
+        $ledger = new LedgerService($pdo);
+        $ledger->addEntry(
+            (int)$req['user_id'],
+            'withdrawal_refund',
+            (float)$req['amount'],
+            'credit',
+            'withdrawal_reject:' . $id,
+            'admin_action',
+            ['source' => 'admin']
+        );
+
         $pdo->prepare('UPDATE withdrawal_requests SET status = "rejected" WHERE id = ?')->execute([$id]);
         $pdo->prepare('UPDATE transactions SET status = "rejected" WHERE id = ?')->execute([$req['transaction_id']]);
     }

@@ -47,7 +47,7 @@ class RegistrationPropertyTest extends TestCase
                 ref_code TEXT DEFAULT '',
                 registration_ip TEXT DEFAULT NULL,
                 referral_snapshot TEXT DEFAULT NULL,
-                display_name TEXT DEFAULT NULL,
+                nickname TEXT DEFAULT NULL,
                 is_bot INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )

@@ -25,8 +25,11 @@ $_SESSION['email']   = $user['email'];
 
 echo json_encode([
     'user' => [
-        'id'      => (int)$user['id'],
-        'email'   => $user['email'],
-        'balance' => (float)$user['balance'],
+        'id'                  => (int)$user['id'],
+        'email'               => $user['email'],
+        'balance'             => (float)$user['balance'],
+        'nickname'            => $user['nickname'],
+        'nickname_changed_at' => $user['nickname_changed_at'],
+        'can_change_nickname' => !$user['nickname_changed_at'] || (time() - strtotime($user['nickname_changed_at'])) >= 86400,
     ]
 ]);
