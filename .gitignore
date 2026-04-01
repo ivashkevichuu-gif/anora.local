@@ -1,0 +1,20 @@
+# Archives
+anora.local.zip
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build output
+assets/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
