@@ -67,6 +67,12 @@ export const api = {
   }),
   gameVerify: (gameId) => request(`/game/verify.php?game_id=${gameId}`),
 
+  // Device fingerprint
+  submitFingerprint: (canvasHash) => request('/game/fingerprint.php', {
+    method: 'POST',
+    body: JSON.stringify({ canvas_hash: canvasHash }),
+  }),
+
   // Crypto
   cryptoDeposit:    body         => request('/account/crypto_deposit.php',  { method: 'POST', body: JSON.stringify(body) }),
   cryptoWithdraw:   body         => request('/account/crypto_withdraw.php', { method: 'POST', body: JSON.stringify(body) }),
@@ -92,4 +98,15 @@ export const api = {
   // Admin lottery
   adminLotteryGames:   ()             => request('/admin/lottery_games.php'),
   adminSystemBalance:  (page = 1)     => request(`/admin/system_balance.php?page=${page}`),
+
+  // Admin finance & health
+  adminFinanceDashboard: () => request('/admin/finance_dashboard.php'),
+  adminHealthCheck:      () => request('/admin/health_check.php'),
+
+  // Admin games analytics
+  adminGamesAnalytics: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/admin/games_analytics.php?${qs}`);
+  },
+  adminGamesAnalyticsDetail: (roundId) => request(`/admin/games_analytics.php?round_id=${roundId}`),
 }

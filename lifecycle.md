@@ -1,4 +1,4 @@
-# ANORA Platform Lifecycle — v1.0.27
+# ANORA Platform Lifecycle — v1.2.29
 
 > Domain: anora.bet | Stack: PHP 8.4 + MySQL 8 (InnoDB) + React + Vite
 

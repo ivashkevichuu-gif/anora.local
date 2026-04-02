@@ -249,6 +249,22 @@ CREATE TABLE IF NOT EXISTS crypto_payouts (
     INDEX idx_cp_user_date (user_id, created_at)
 );
 
+-- ── Device Fingerprints (append-only, anti-fraud) ────────────────────────────
+CREATE TABLE IF NOT EXISTS device_fingerprints (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    session_id  VARCHAR(128) NOT NULL,
+    ip_address  VARCHAR(45) NOT NULL,
+    user_agent  TEXT NOT NULL,
+    canvas_hash VARCHAR(64) DEFAULT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_ip_address (ip_address),
+    INDEX idx_canvas_hash (canvas_hash),
+    INDEX idx_created_at (created_at)
+);
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- SEED DATA
 -- ══════════════════════════════════════════════════════════════════════════════

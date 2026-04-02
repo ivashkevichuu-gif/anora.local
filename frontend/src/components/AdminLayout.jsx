@@ -10,6 +10,8 @@ import CryptoInvoices   from '../pages/admin/CryptoInvoices'
 import CryptoPayouts    from '../pages/admin/CryptoPayouts'
 import LedgerExplorer   from '../pages/admin/LedgerExplorer'
 import ActivityMonitor   from '../pages/admin/ActivityMonitor'
+import FinanceDashboard from '../pages/admin/FinanceDashboard'
+import GamesAnalytics  from '../pages/admin/GamesAnalytics'
 
 export default function AdminLayout() {
   const { adminLogout } = useAdmin()
@@ -38,6 +40,8 @@ export default function AdminLayout() {
           <NavLink to="/admin/crypto-payouts" className={link}><i className="bi bi-wallet2 me-2"></i>Crypto Payouts</NavLink>
           <NavLink to="/admin/ledger" className={link}><i className="bi bi-journal-text me-2"></i>Ledger Explorer</NavLink>
           <NavLink to="/admin/activity-monitor" className={link}><i className="bi bi-shield-exclamation me-2"></i>Activity Monitor</NavLink>
+          <NavLink to="/admin/finance" className={link}><i className="bi bi-graph-up me-2"></i>Finance Dashboard</NavLink>
+          <NavLink to="/admin/games-analytics" className={link}><i className="bi bi-bar-chart-line me-2"></i>Games Analytics</NavLink>
         </nav>
         <div className="mt-auto">
           <button className="nav-link btn btn-link text-danger p-0" onClick={handleLogout}>
@@ -57,6 +61,8 @@ export default function AdminLayout() {
           <Route path="crypto-payouts"  element={<CryptoPayouts />} />
           <Route path="ledger"          element={<LedgerExplorer />} />
           <Route path="activity-monitor" element={<ActivityMonitor />} />
+          <Route path="finance" element={<FinanceDashboard />} />
+          <Route path="games-analytics" element={<GamesAnalytics />} />
         </Routes>
       </div>
     </div>

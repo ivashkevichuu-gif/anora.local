@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import StatusMessage from '../components/ui/StatusMessage'
+import { getCanvasFingerprint } from '../utils/fingerprint'
+import { api } from '../api/client'
 
 export default function Login() {
   const { login }   = useAuth()
@@ -18,6 +20,18 @@ export default function Login() {
     setBusy(true)
     try {
       await login(form.email, form.password)
+
+      // Collect and submit device fingerprint once per session
+      if (!sessionStorage.getItem('fp_submitted')) {
+        try {
+          const canvasHash = await getCanvasFingerprint()
+          await api.submitFingerprint(canvasHash)
+          sessionStorage.setItem('fp_submitted', '1')
+        } catch (fpErr) {
+          console.error('Fingerprint submission failed:', fpErr)
+        }
+      }
+
       navigate('/account')
     } catch (err) {
       setError(err.message)
