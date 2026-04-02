@@ -1,0 +1,14 @@
+{
+  "name": "anora-websocket",
+  "version": "1.0.0",
+  "description": "ANORA WebSocket server for real-time game events",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

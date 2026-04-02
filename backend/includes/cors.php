@@ -1,4 +1,10 @@
 <?php
+/**
+ * @deprecated CORS handling has been moved to the nginx API Gateway (docker/nginx/nginx.conf).
+ * This file is retained for backward compatibility during the transition period.
+ * Do NOT add new CORS logic here — all CORS configuration is centralized in nginx.
+ * This file will be removed in a future release once all endpoints are served through the API Gateway.
+ */
 header('Content-Type: application/json');
 
 // Allow requests from the same origin (relative API calls) and any explicit origin

@@ -1,0 +1,155 @@
+version: "3.8"
+
+services:
+  # ── MySQL ────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - anora-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Redis ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --appendonly yes
+      ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    volumes:
+      - redis_data:/data
+    networks:
+      - anora-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── PHP-FPM ──────────────────────────────────────────────────────────────
+  php-fpm:
+    build:
+      context: .
+      dockerfile: docker/php-fpm/Dockerfile
+    environment:
+      DB_WRITE_HOST: ${DB_WRITE_HOST}
+      DB_READ_HOST: ${DB_READ_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      NOWPAYMENTS_API_KEY: ${NOWPAYMENTS_API_KEY}
+      NOWPAYMENTS_IPN_SECRET: ${NOWPAYMENTS_IPN_SECRET}
+      NOWPAYMENTS_API_BASE: ${NOWPAYMENTS_API_BASE}
+      NOWPAYMENTS_SANDBOX: ${NOWPAYMENTS_SANDBOX}
+      LOG_LEVEL: ${LOG_LEVEL}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - anora-network
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ── Game Worker ──────────────────────────────────────────────────────────
+  game-worker:
+    build:
+      context: .
+      dockerfile: docker/game-worker/Dockerfile
+    environment:
+      DB_WRITE_HOST: ${DB_WRITE_HOST}
+      DB_READ_HOST: ${DB_READ_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL}
+    deploy:
+      replicas: 2
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - anora-network
+    restart: unless-stopped
+
+  # ── WebSocket Server ─────────────────────────────────────────────────────
+  websocket:
+    build:
+      context: .
+      dockerfile: docker/websocket/Dockerfile
+    environment:
+      WS_PORT: ${WS_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - anora-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:8080 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ── nginx API Gateway ────────────────────────────────────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      php-fpm:
+        condition: service_healthy
+      websocket:
+        condition: service_healthy
+    networks:
+      - anora-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:80 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  anora-network:
+    driver: bridge

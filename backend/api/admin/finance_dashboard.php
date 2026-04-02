@@ -6,9 +6,11 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/ledger_service.php';
 requireAdmin();
 
+global $pdo_read;
+
 // total_deposits: SUM(amount) from ledger_entries WHERE type IN ('deposit','crypto_deposit')
 // AND direction='credit' AND user is_bot=0
-$stmt = $pdo->prepare(
+$stmt = $pdo_read->prepare(
     "SELECT COALESCE(SUM(le.amount), 0) AS total
      FROM ledger_entries le
      JOIN users u ON u.id = le.user_id
@@ -21,7 +23,7 @@ $totalDeposits = (float) $stmt->fetchColumn();
 
 // total_withdrawals: SUM(amount) from ledger_entries WHERE type IN ('withdrawal','crypto_withdrawal')
 // AND direction='debit' AND user is_bot=0
-$stmt = $pdo->prepare(
+$stmt = $pdo_read->prepare(
     "SELECT COALESCE(SUM(le.amount), 0) AS total
      FROM ledger_entries le
      JOIN users u ON u.id = le.user_id
@@ -33,7 +35,7 @@ $stmt->execute();
 $totalWithdrawals = (float) $stmt->fetchColumn();
 
 // system_profit: balance from user_balances WHERE user_id = SYSTEM_USER_ID
-$stmt = $pdo->prepare("SELECT COALESCE(balance, 0) FROM user_balances WHERE user_id = ?");
+$stmt = $pdo_read->prepare("SELECT COALESCE(balance, 0) FROM user_balances WHERE user_id = ?");
 $stmt->execute([SYSTEM_USER_ID]);
 $systemProfit = (float) $stmt->fetchColumn();
 
@@ -41,7 +43,7 @@ $systemProfit = (float) $stmt->fetchColumn();
 $netPlatformPosition = $totalDeposits - $totalWithdrawals;
 
 // total_bets_volume: SUM(amount) from ledger_entries WHERE type='bet' AND direction='debit' AND is_bot=0
-$stmt = $pdo->prepare(
+$stmt = $pdo_read->prepare(
     "SELECT COALESCE(SUM(le.amount), 0) AS total
      FROM ledger_entries le
      JOIN users u ON u.id = le.user_id
@@ -53,7 +55,7 @@ $stmt->execute();
 $totalBetsVolume = (float) $stmt->fetchColumn();
 
 // total_payouts_volume: SUM(amount) from ledger_entries WHERE type='win' AND direction='credit' AND is_bot=0
-$stmt = $pdo->prepare(
+$stmt = $pdo_read->prepare(
     "SELECT COALESCE(SUM(le.amount), 0) AS total
      FROM ledger_entries le
      JOIN users u ON u.id = le.user_id

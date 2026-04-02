@@ -5,11 +5,12 @@ require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 requireAdmin();
 
-// ── Detail mode: single round with bets and provably fair data ──────────────
+global $pdo_read;
+
 if (!empty($_GET['round_id'])) {
     $roundId = (int) $_GET['round_id'];
 
-    $stmt = $pdo->prepare(
+    $stmt = $pdo_read->prepare(
         "SELECT gr.id, gr.room, gr.total_pot, gr.winner_id,
                 COALESCE(u.nickname, u.email) AS winner_name,
                 gr.winner_net, gr.commission, gr.referral_bonus,
@@ -37,7 +38,7 @@ if (!empty($_GET['round_id'])) {
     $round['referral_bonus'] = (float) $round['referral_bonus'];
 
     // Fetch all bets for this round
-    $betsStmt = $pdo->prepare(
+    $betsStmt = $pdo_read->prepare(
         "SELECT gb.user_id, COALESCE(u.nickname, u.email) AS display_name,
                 gb.amount, gb.client_seed
          FROM game_bets gb
@@ -96,13 +97,13 @@ if (!empty($_GET['date_to'])) {
 $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
 // ── Total count ─────────────────────────────────────────────────────────────
-$countStmt = $pdo->prepare("SELECT COUNT(*) FROM game_rounds gr $whereSQL");
+$countStmt = $pdo_read->prepare("SELECT COUNT(*) FROM game_rounds gr $whereSQL");
 $countStmt->execute($params);
 $totalRounds = (int) $countStmt->fetchColumn();
 $totalPages  = (int) ceil($totalRounds / max(1, $perPage));
 
 // ── Aggregate sums for RTP ──────────────────────────────────────────────────
-$aggStmt = $pdo->prepare(
+$aggStmt = $pdo_read->prepare(
     "SELECT COALESCE(SUM(gr.total_pot), 0) AS total_pot_sum,
             COALESCE(SUM(gr.winner_net), 0) AS total_payout_sum
      FROM game_rounds gr $whereSQL"
@@ -116,7 +117,7 @@ $globalRtp = $totalPotSum > 0 ? round($totalPayoutSum / $totalPotSum * 100, 2) :
 
 // ── RTP by room ─────────────────────────────────────────────────────────────
 $rtpByRoom = [];
-$rtpStmt = $pdo->prepare(
+$rtpStmt = $pdo_read->prepare(
     "SELECT gr.room,
             COALESCE(SUM(gr.total_pot), 0) AS pot,
             COALESCE(SUM(gr.winner_net), 0) AS payout
@@ -132,7 +133,7 @@ while ($row = $rtpStmt->fetch(PDO::FETCH_ASSOC)) {
 }
 
 // ── Paginated rounds ────────────────────────────────────────────────────────
-$dataStmt = $pdo->prepare(
+$dataStmt = $pdo_read->prepare(
     "SELECT gr.id, gr.room, gr.total_pot, gr.winner_id,
             COALESCE(u.nickname, u.email) AS winner_name,
             gr.winner_net, gr.commission, gr.referral_bonus, gr.finished_at,

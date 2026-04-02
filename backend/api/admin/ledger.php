@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 requireAdmin();
 
+global $pdo_read;
+
 $page    = max(1, (int)($_GET['page'] ?? 1));
 $perPage = min(200, max(1, (int)($_GET['per_page'] ?? 50)));
 $offset  = ($page - 1) * $perPage;
@@ -44,14 +46,14 @@ if (!empty($_GET['reference_id'])) {
 $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 // Count
-$countStmt = $pdo->prepare(
+$countStmt = $pdo_read->prepare(
     "SELECT COUNT(*) FROM ledger_entries le JOIN users u ON u.id = le.user_id $whereSQL"
 );
 $countStmt->execute($params);
 $totalCount = (int)$countStmt->fetchColumn();
 
 // Fetch page
-$dataStmt = $pdo->prepare(
+$dataStmt = $pdo_read->prepare(
     "SELECT le.id, le.user_id, u.email, le.type, le.amount, le.direction,
             le.balance_after, le.reference_id, le.reference_type, le.created_at
      FROM ledger_entries le
