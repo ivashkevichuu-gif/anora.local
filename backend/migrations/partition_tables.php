@@ -23,9 +23,10 @@ function runPartitionMigration(PDO $pdo): void
     $logger = StructuredLogger::getInstance();
     $logger->info("Partition migration started");
 
+    // Generate partition definitions for the past 12 months + 3 months ahead
+    $partitionDefs = generateInitialPartitions();
+
     // ── ledger_entries ──────────────────────────────────────────────────
-    // ledger_entries has no FK constraints pointing to other tables,
-    // but other tables may reference it. Drop any FK on ledger_entries itself.
     try {
         $logger->info("Partitioning ledger_entries");
 
@@ -36,15 +37,31 @@ function runPartitionMigration(PDO $pdo): void
             $logger->info("Dropped FK on ledger_entries", ['fk' => $fk]);
         }
 
-        // Generate partition definitions for the past 12 months + 3 months ahead
-        $partitionDefs = generateInitialPartitions();
+        // Drop unique constraints that don't include created_at
+        // MySQL requires partitioning column in every unique key
+        $uniques = getUniqueKeys($pdo, 'ledger_entries');
+        foreach ($uniques as $uk) {
+            if ($uk !== 'PRIMARY') {
+                $pdo->exec("ALTER TABLE ledger_entries DROP INDEX `{$uk}`");
+                $logger->info("Dropped unique index on ledger_entries", ['index' => $uk]);
+            }
+        }
+
+        // Change PRIMARY KEY to include created_at (required for RANGE COLUMNS partitioning)
+        $pdo->exec("ALTER TABLE ledger_entries DROP PRIMARY KEY, ADD PRIMARY KEY (id, created_at)");
+        $logger->info("Updated PRIMARY KEY on ledger_entries to include created_at");
+
+        // Re-add unique constraint with created_at included
+        $pdo->exec("ALTER TABLE ledger_entries ADD UNIQUE INDEX uq_ref (reference_type, reference_id, user_id, type, created_at)");
+        $logger->info("Re-added unique index on ledger_entries with created_at");
 
         $sql = "ALTER TABLE ledger_entries PARTITION BY RANGE COLUMNS(created_at) ({$partitionDefs})";
         $pdo->exec($sql);
         $logger->info("ledger_entries partitioned successfully");
     } catch (\PDOException $e) {
         $logger->error("Failed to partition ledger_entries", [], [], $e);
-        throw $e;
+        echo "WARNING: ledger_entries partitioning failed: " . $e->getMessage() . "\n";
+        echo "Continuing with game_bets...\n";
     }
 
     // ── game_bets ───────────────────────────────────────────────────────
@@ -58,12 +75,16 @@ function runPartitionMigration(PDO $pdo): void
             $logger->info("Dropped FK on game_bets", ['fk' => $fk]);
         }
 
+        // Change PRIMARY KEY to include created_at
+        $pdo->exec("ALTER TABLE game_bets DROP PRIMARY KEY, ADD PRIMARY KEY (id, created_at)");
+        $logger->info("Updated PRIMARY KEY on game_bets to include created_at");
+
         $sql = "ALTER TABLE game_bets PARTITION BY RANGE COLUMNS(created_at) ({$partitionDefs})";
         $pdo->exec($sql);
         $logger->info("game_bets partitioned successfully");
     } catch (\PDOException $e) {
         $logger->error("Failed to partition game_bets", [], [], $e);
-        throw $e;
+        echo "WARNING: game_bets partitioning failed: " . $e->getMessage() . "\n";
     }
 
     $logger->info("Partition migration completed");
@@ -80,6 +101,22 @@ function getForeignKeys(PDO $pdo, string $table): array
     $stmt = $pdo->prepare(
         "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
          WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
+    );
+    $stmt->execute([$schema, $table]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/**
+ * Get unique key constraint names for a table (excluding PRIMARY).
+ *
+ * @return array<string> Index names
+ */
+function getUniqueKeys(PDO $pdo, string $table): array
+{
+    $schema = getenv('DB_NAME') ?: (defined('DB_NAME') ? DB_NAME : 'anora');
+    $stmt = $pdo->prepare(
+        "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_TYPE = 'UNIQUE'"
     );
     $stmt->execute([$schema, $table]);
     return $stmt->fetchAll(PDO::FETCH_COLUMN);

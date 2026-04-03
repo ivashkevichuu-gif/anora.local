@@ -120,10 +120,15 @@ cd anora
 cd /var/www/anora/frontend
 npm ci
 npm run build
-
-# Скопировать билд в корень проекта (Docker nginx берёт отсюда)
-cp -r dist/* /var/www/anora/
 cd /var/www/anora
+```
+
+Vite настроен выводить билд в корень проекта (`../`). После `npm run build` файлы `index.html` и `assets/` уже на месте — копировать не нужно.
+
+Проверить:
+
+```bash
+ls /var/www/anora/assets/index-*.js
 ```
 
 ### 6. Настроить переменные окружения
@@ -382,7 +387,7 @@ cd /var/www/anora
 git pull
 
 # Пересобрать frontend (если менялся)
-cd frontend && npm ci && npm run build && cp -r dist/* ../ && cd ..
+cd frontend && npm ci && npm run build && cd ..
 
 # Пересобрать и перезапустить контейнеры
 docker-compose up -d --build
