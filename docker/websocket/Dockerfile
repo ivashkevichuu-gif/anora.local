@@ -3,10 +3,10 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files first for better layer caching
-COPY websocket/package.json websocket/package-lock.json* ./
+COPY websocket/package.json ./
 
 # Install production dependencies
-RUN npm ci --production
+RUN npm install --omit=dev
 
 # Copy application source
 COPY websocket/ .

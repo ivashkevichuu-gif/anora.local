@@ -50,6 +50,358 @@ Gambling-платформа с provably fair лотереей, crypto-плате
   └────────────────────┘
 ```
 
+## Развёртывание на Hetzner Cloud (anora.bet)
+
+Пошаговая инструкция для запуска платформы на VPS Hetzner с доменом `anora.bet`.
+
+### 1. Создать сервер в Hetzner Cloud
+
+1. Зайти в [Hetzner Cloud Console](https://console.hetzner.cloud/)
+2. Create Server:
+   - Location: Helsinki (или ближайший к аудитории)
+   - Image: Ubuntu 22.04 (или 24.04)
+   - Type: CX21 минимум (2 vCPU, 4 GB RAM) — рекомендуется CX31 (2 vCPU, 8 GB)
+   - SSH Key: добавить свой публичный ключ
+3. Запомнить IP-адрес сервера
+
+### 2. Настроить DNS
+
+В панели регистратора домена `anora.bet` добавить A-записи:
+
+```
+anora.bet       A    <server-ip>
+www.anora.bet   A    <server-ip>
+```
+
+Подождать 5-15 минут на распространение DNS.
+
+### 3. Подключиться к серверу и установить зависимости
+
+```bash
+ssh root@<server-ip>
+
+# Обновить систему
+apt update && apt upgrade -y
+
+# Установить Docker
+curl -fsSL https://get.docker.com | sh
+
+# Установить docker-compose
+apt install -y docker-compose
+
+# Установить nginx (системный, как reverse proxy)
+apt install -y nginx certbot python3-certbot-nginx
+
+# Установить Node.js (для сборки frontend)
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+
+# Проверить
+docker --version
+docker-compose --version
+nginx -v
+node --version
+```
+
+### 4. Клонировать проект
+
+```bash
+mkdir -p /var/www
+cd /var/www
+git clone <repo-url> anora
+cd anora
+```
+
+### 5. Собрать frontend
+
+```bash
+cd /var/www/anora/frontend
+npm ci
+npm run build
+
+# Скопировать билд в корень проекта (для Docker nginx)
+cp -r dist/* /var/www/anora/
+cd /var/www/anora
+```
+
+### 6. Настроить переменные окружения
+
+```bash
+cd /var/www/anora
+cp .env.example .env
+nano .env
+```
+
+Заполнить:
+
+```dotenv
+DB_WRITE_HOST=mysql
+DB_READ_HOST=mysql
+DB_USER=anora
+DB_PASS=<сгенерировать-сильный-пароль>
+DB_NAME=anora
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+JWT_SECRET=<сгенерировать-64-символа>
+
+NOWPAYMENTS_API_KEY=<ваш-ключ>
+NOWPAYMENTS_IPN_SECRET=<ваш-секрет>
+NOWPAYMENTS_API_BASE=https://api.nowpayments.io/v1
+NOWPAYMENTS_SANDBOX=false
+
+LOG_LEVEL=info
+WS_PORT=8080
+CORS_ORIGIN=https://anora.bet
+```
+
+Генерация секретов:
+
+```bash
+# JWT Secret
+openssl rand -hex 32
+
+# DB Password
+openssl rand -base64 24
+```
+
+### 7. Запустить Docker-контейнеры
+
+```bash
+cd /var/www/anora
+docker-compose up -d --build
+```
+
+Проверить что всё поднялось:
+
+```bash
+docker-compose ps
+```
+
+Должно быть 6 сервисов (mysql, redis, php-fpm, game-worker x2, websocket, nginx). Контейнер nginx слушает на порту 8080.
+
+Проверить логи при проблемах:
+
+```bash
+docker-compose logs --tail=30 php-fpm
+docker-compose logs --tail=30 mysql
+docker-compose logs --tail=30 game-worker
+docker-compose logs --tail=30 websocket
+docker-compose logs --tail=30 nginx
+```
+
+### 8. Применить миграции
+
+```bash
+docker-compose exec php-fpm php migrations/init.php
+```
+
+### 9. Настроить системный nginx как reverse proxy
+
+Docker nginx слушает на порту 8080. Системный nginx на порту 80/443 проксирует к нему.
+
+```bash
+nano /etc/nginx/sites-available/anora.bet
+```
+
+Вставить:
+
+```nginx
+server {
+    listen 80;
+    server_name anora.bet www.anora.bet;
+
+    # Максимальный размер загрузки (для импорта файлов)
+    client_max_body_size 50M;
+
+    # API и статика → Docker nginx
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+
+    # WebSocket → Docker nginx → websocket container
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}
+```
+
+Активировать:
+
+```bash
+ln -sf /etc/nginx/sites-available/anora.bet /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl reload nginx
+```
+
+Проверить: `http://anora.bet` должен открыть платформу.
+
+### 10. Установить SSL-сертификат (Let's Encrypt)
+
+```bash
+certbot --nginx -d anora.bet -d www.anora.bet
+```
+
+Certbot автоматически:
+- Получит сертификат
+- Настроит nginx на HTTPS (443)
+- Добавит редирект HTTP → HTTPS
+- Настроит автообновление через cron/systemd timer
+
+Проверить: `https://anora.bet`
+
+Автообновление сертификата (уже настроено certbot'ом, но проверить):
+
+```bash
+certbot renew --dry-run
+```
+
+### 11. Настроить Cron-задачи
+
+```bash
+crontab -e
+```
+
+Добавить:
+
+```cron
+# Reconciliation — проверка финансовых инвариантов (каждые 5 минут)
+*/5 * * * * docker exec anora_php-fpm_1 php cron/reconciliation.php >> /var/log/anora-reconciliation.log 2>&1
+
+# Cleanup — удаление старых данных (ежедневно в 3:00)
+0 3 * * * docker exec anora_php-fpm_1 php cron/cleanup.php >> /var/log/anora-cleanup.log 2>&1
+
+# Worker Recovery — восстановление задач мёртвых воркеров (каждую минуту)
+* * * * * docker exec anora_php-fpm_1 php cron/worker_recovery.php >> /var/log/anora-worker-recovery.log 2>&1
+
+# Partition Manager — создание партиций БД (воскресенье 2:00)
+0 2 * * 0 docker exec anora_php-fpm_1 php cron/partition_manager.php >> /var/log/anora-partition.log 2>&1
+
+# Bot Runner (каждую минуту)
+* * * * * for i in 0 2 4 12; do sleep $i; docker exec anora_php-fpm_1 php bot_runner.php; done >> /var/log/anora-bot.log 2>&1
+```
+
+### 12. Настроить файрвол (UFW)
+
+```bash
+ufw allow 22/tcp    # SSH
+ufw allow 80/tcp    # HTTP
+ufw allow 443/tcp   # HTTPS
+ufw enable
+ufw status
+```
+
+Порт 8080 не открывать наружу — он только для внутреннего проксирования.
+
+### 13. Проверить работу платформы
+
+```bash
+# Сайт
+curl -I https://anora.bet
+
+# API
+curl https://anora.bet/api/game/status.php
+
+# Health check
+curl https://anora.bet/api/admin/health_check.php
+
+# Docker статус
+docker-compose ps
+
+# Логи game worker
+docker-compose logs --tail=10 game-worker
+
+# Логи WebSocket
+docker-compose logs --tail=10 websocket
+
+# Redis
+docker exec anora_redis_1 redis-cli ping
+```
+
+### 14. Партиционирование БД (опционально, для production)
+
+```bash
+docker exec anora_php-fpm_1 php migrations/partition_tables.php
+```
+
+### Обновление платформы
+
+```bash
+cd /var/www/anora
+git pull
+
+# Пересобрать frontend (если менялся)
+cd frontend && npm ci && npm run build && cp -r dist/* ../ && cd ..
+
+# Пересобрать и перезапустить контейнеры
+docker-compose up -d --build
+
+# Применить новые миграции (если есть)
+docker-compose exec php-fpm php migrations/init.php
+```
+
+### Мониторинг и логи
+
+```bash
+# Все логи Docker
+docker-compose logs -f
+
+# Конкретный сервис
+docker-compose logs -f game-worker
+
+# Reconciliation (последний результат)
+docker exec anora_php-fpm_1 cat logs/reconciliation_latest.json
+
+# Использование ресурсов
+docker stats
+
+# Место на диске
+df -h
+docker system df
+```
+
+### Бэкап базы данных
+
+```bash
+# Создать бэкап
+docker exec anora_mysql_1 mysqldump -u anora -p<DB_PASS> anora > /var/backups/anora_$(date +%Y%m%d_%H%M%S).sql
+
+# Автоматический ежедневный бэкап (добавить в crontab)
+0 4 * * * docker exec anora_mysql_1 mysqldump -u anora -p<DB_PASS> anora | gzip > /var/backups/anora_$(date +\%Y\%m\%d).sql.gz 2>&1
+```
+
+### Troubleshooting (Hetzner)
+
+| Проблема | Решение |
+|----------|---------|
+| `port 80 already in use` | Системный nginx занимает порт. Docker nginx слушает на 8080, системный проксирует к нему |
+| `container unhealthy` | `docker-compose logs <service>` — посмотреть ошибки. Часто: MySQL ещё не готов (подождать 30с) |
+| `502 Bad Gateway` | PHP-FPM или WebSocket контейнер не запустился: `docker-compose ps` и `docker-compose logs` |
+| `WebSocket не подключается` | Проверить что в системном nginx есть блок `location /ws/` с upgrade headers |
+| `SSL не работает` | `certbot --nginx -d anora.bet` — убедиться что DNS A-запись указывает на IP сервера |
+| `MySQL connection refused` | Контейнер ещё стартует. `docker-compose logs mysql` — подождать `ready for connections` |
+| `Нет места на диске` | `docker system prune -a` — удалить неиспользуемые образы и контейнеры |
+| `Game Worker не обрабатывает раунды` | `docker-compose logs game-worker` — проверить подключение к Redis и MySQL |
+| `Высокая нагрузка CPU` | `docker stats` — найти контейнер. Обычно game-worker. Рассмотреть апгрейд сервера до CX31 |
+
 ## Быстрый старт (Docker)
 
 ### 1. Клонировать репозиторий

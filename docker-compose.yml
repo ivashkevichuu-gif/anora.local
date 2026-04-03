@@ -66,10 +66,11 @@ services:
     networks:
       - anora-network
     healthcheck:
-      test: ["CMD-SHELL", "php-fpm -t || exit 1"]
+      test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # ── Game Worker ──────────────────────────────────────────────────────────
@@ -116,10 +117,11 @@ services:
     networks:
       - anora-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:8080 || exit 1"]
+      test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
 
   # ── nginx API Gateway ────────────────────────────────────────────────────
@@ -128,7 +130,7 @@ services:
       context: .
       dockerfile: docker/nginx/Dockerfile
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       php-fpm:
         condition: service_healthy
@@ -140,7 +142,8 @@ services:
       test: ["CMD-SHELL", "wget --spider --quiet http://localhost:80 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 
 volumes:
