@@ -24,9 +24,9 @@ require_once __DIR__ . '/../includes/structured_logger.php';
 
 // Legacy constants (backward compatibility)
 define('DB_HOST', getenv('DB_WRITE_HOST') ?: 'localhost');
-define('DB_USER', getenv('DB_USER') ?: 'ivash536_anora');
-define('DB_PASS', getenv('DB_PASS') ?: 'QjMVmHxVh73cQwnaXUQz');
-define('DB_NAME', getenv('DB_NAME') ?: 'ivash536_anora');
+define('DB_USER', getenv('DB_USER') ?: 'anora');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'anora');
 
 $db_write_host = DB_HOST;
 $db_read_host  = getenv('DB_READ_HOST') ?: $db_write_host;

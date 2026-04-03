@@ -1,10 +1,11 @@
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ANORA Platform — Clean Database Schema
 -- Run this on a fresh MySQL 8 instance. Creates everything from scratch.
+-- Docker: database is created by MYSQL_DATABASE env var, no CREATE/USE needed.
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE DATABASE IF NOT EXISTS ivash536_anora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE ivash536_anora;
+-- CREATE DATABASE IF NOT EXISTS anora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE anora;
 
 -- ── Users ────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
