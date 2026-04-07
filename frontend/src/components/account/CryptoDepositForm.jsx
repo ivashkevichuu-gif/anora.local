@@ -80,8 +80,8 @@ export default function CryptoDepositForm({ onSuccess }) {
             <label className="form-label">Amount (USD)</label>
             <input
               type="number" className="form-control"
-              min="1" step="0.01" required
-              placeholder="Minimum $1.00"
+              min="15" step="0.01" required
+              placeholder="Minimum $15.00"
               value={amount} onChange={e => setAmount(e.target.value)}
             />
           </div>
@@ -102,7 +102,7 @@ export default function CryptoDepositForm({ onSuccess }) {
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
                 <thead>
-                  <tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+                  <tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr>
                 </thead>
                 <tbody>
                   {invoices.map(inv => {
@@ -117,6 +117,14 @@ export default function CryptoDepositForm({ onSuccess }) {
                           </span>
                         </td>
                         <td className="text-muted small">{inv.created_at}</td>
+                        <td>
+                          {(inv.status === 'pending' || inv.status === 'waiting') && inv.invoice_url && (
+                            <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer"
+                               style={{ color: '#a78bfa', textDecoration: 'none', fontSize: '0.85rem' }}>
+                              Pay here <i className="bi bi-box-arrow-up-right ms-1" />
+                            </a>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}

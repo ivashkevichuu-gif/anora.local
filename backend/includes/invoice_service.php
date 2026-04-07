@@ -29,8 +29,8 @@ class InvoiceService
     public function createInvoice(int $userId, float $amountUsd): array
     {
         // Validate minimum amount
-        if ($amountUsd < 1.00) {
-            throw new InvalidArgumentException('Minimum deposit is $1.00 USD');
+        if ($amountUsd < 15.00) {
+            throw new InvalidArgumentException('Minimum deposit is $15.00 USD');
         }
 
         // Check rate limit: max 5 invoices per user per 60 minutes
