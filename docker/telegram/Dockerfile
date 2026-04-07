@@ -6,7 +6,7 @@ WORKDIR /app
 COPY telegram/package.json ./
 
 # Install production dependencies
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Copy application source
 COPY telegram/ .
