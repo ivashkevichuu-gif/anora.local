@@ -516,7 +516,26 @@ class GameEngine
         // Return the finished round
         $finalStmt = $this->pdo->prepare("SELECT * FROM game_rounds WHERE id = ?");
         $finalStmt->execute([$roundId]);
-        return $finalStmt->fetch(PDO::FETCH_ASSOC);
+        $finishedRound = $finalStmt->fetch(PDO::FETCH_ASSOC);
+
+        // Publish game:finished event to Redis Pub/Sub (for Telegram bot + WebSocket)
+        try {
+            require_once __DIR__ . '/redis_client.php';
+            $redisClient = RedisClient::getInstance();
+            if ($redisClient->isAvailable()) {
+                $redis = $redisClient->getConnection();
+                $redis->publish('game:finished', json_encode([
+                    'round_id'  => $roundId,
+                    'winner_id' => $winnerId,
+                    'room'      => (int) $round['room'],
+                    'winner_net' => $winnerNet,
+                ]));
+            }
+        } catch (\Throwable $e) {
+            error_log("[GameEngine] Failed to PUBLISH game:finished for round #$roundId: " . $e->getMessage());
+        }
+
+        return $finishedRound;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
