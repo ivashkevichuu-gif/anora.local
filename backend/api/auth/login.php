@@ -3,7 +3,7 @@
  * POST /api/auth/login
  *
  * Authenticates user with email/password, returns JWT access_token + refresh_token.
- * Keeps existing password_verify logic. Adds audit log via StructuredLogger.
+ * Also creates PHP session for backward compatibility with frontend.
  *
  * Feature: production-architecture-overhaul
  * Validates: Requirements 1.1, 1.3
@@ -11,6 +11,7 @@
 
 declare(strict_types=1);
 
+session_start();
 require_once __DIR__ . '/../../includes/cors.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/jwt_service.php';
@@ -58,6 +59,9 @@ $accessToken = $jwtService->encode((int)$user['id'], $role);
 $refreshData = $jwtService->createRefreshToken($pdo, (int)$user['id']);
 
 $logger->audit('login', 'success', (int)$user['id'], $ipAddress, $userAgent);
+
+// Set session for backward compatibility with frontend (credentials: 'include')
+$_SESSION['user_id'] = (int)$user['id'];
 
 echo json_encode([
     'access_token'  => $accessToken,
