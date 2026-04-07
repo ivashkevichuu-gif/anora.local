@@ -1,27 +1,19 @@
 FROM php:8.4-fpm-alpine
 
-# Install build dependencies, PHP extensions, and Postfix for mail()
+# Install build dependencies, PHP extensions, and msmtp for mail()
 RUN apk add --no-cache \
         $PHPIZE_DEPS \
         linux-headers \
-        postfix \
+        msmtp \
     && docker-php-ext-install pdo_mysql pcntl \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS linux-headers
+    && apk del $PHPIZE_DEPS linux-headers \
+    && echo 'sendmail_path = "/usr/bin/msmtp -t"' > /usr/local/etc/php/conf.d/mail.ini
 
-# Configure Postfix for direct sending from noreply@anora.bet
-RUN postconf -e "myhostname = anora.bet" \
-    && postconf -e "mydomain = anora.bet" \
-    && postconf -e "myorigin = anora.bet" \
-    && postconf -e "inet_interfaces = loopback-only" \
-    && postconf -e "mydestination = " \
-    && postconf -e "relayhost = " \
-    && postconf -e "smtp_tls_security_level = may" \
-    && postconf -e "smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt"
-
-# Set PHP to use sendmail (Postfix)
-RUN echo 'sendmail_path = "/usr/sbin/sendmail -t -i"' > /usr/local/etc/php/conf.d/mail.ini
+# Copy msmtp config (SMTP relay for mail())
+COPY docker/php-fpm/msmtprc /etc/msmtprc
+RUN chmod 644 /etc/msmtprc
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -34,10 +26,6 @@ COPY backend/ .
 # Install production dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Start script: launch Postfix then PHP-FPM
-COPY docker/php-fpm/start.sh /start.sh
-RUN chmod +x /start.sh
-
 EXPOSE 9000
 
-CMD ["/start.sh"]
+CMD ["php-fpm"]
