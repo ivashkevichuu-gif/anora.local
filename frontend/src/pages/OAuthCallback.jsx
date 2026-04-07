@@ -13,15 +13,15 @@ import { useAuth } from '../context/AuthContext'
  */
 
 const ERROR_MESSAGES = {
-  state_mismatch:        'Ошибка безопасности. Попробуйте снова.',
-  session_expired:       'Сессия истекла. Попробуйте снова.',
-  token_exchange_failed: 'Не удалось связаться с провайдером. Попробуйте позже.',
-  invalid_token:         'Ошибка верификации. Попробуйте снова.',
-  invalid_claims:        'Ошибка верификации. Попробуйте снова.',
-  account_banned:        'Ваш аккаунт заблокирован.',
-  account_forbidden:     'Вход невозможен для этого аккаунта.',
-  provider_unavailable:  'Провайдер временно недоступен. Попробуйте позже.',
-  internal_error:        'Внутренняя ошибка. Попробуйте позже.',
+  state_mismatch:        'Security error. Please try again.',
+  session_expired:       'Session expired. Please try again.',
+  token_exchange_failed: 'Could not connect to provider. Please try later.',
+  invalid_token:         'Verification error. Please try again.',
+  invalid_claims:        'Verification error. Please try again.',
+  account_banned:        'Your account has been banned.',
+  account_forbidden:     'Login is not available for this account.',
+  provider_unavailable:  'Provider is temporarily unavailable. Please try later.',
+  internal_error:        'Internal error. Please try later.',
 }
 
 export default function OAuthCallback() {
@@ -39,11 +39,11 @@ export default function OAuthCallback() {
       loginWithTokens(accessToken, refreshToken)
         .then(() => navigate('/account', { replace: true }))
         .catch(err => {
-          setError(err.message || 'Ошибка авторизации')
+          setError(err.message || 'Authorization error')
           setTimeout(() => navigate('/login', { replace: true }), 3000)
         })
     } else if (errorCode) {
-      const msg = ERROR_MESSAGES[errorCode] || searchParams.get('message') || 'Неизвестная ошибка'
+      const msg = ERROR_MESSAGES[errorCode] || searchParams.get('message') || 'Unknown error'
       setError(msg)
       setTimeout(() => navigate('/login', { replace: true }), 3000)
     } else {
@@ -71,7 +71,7 @@ export default function OAuthCallback() {
         }}>
           <p style={{ color: '#dc3545', margin: '0 0 8px', fontWeight: 500 }}>{error}</p>
           <p style={{ color: 'var(--text-muted, #888)', fontSize: '13px', margin: 0 }}>
-            Перенаправление на страницу входа...
+            Redirecting to login page...
           </p>
         </div>
       </div>
@@ -90,7 +90,7 @@ export default function OAuthCallback() {
           <span className="visually-hidden">Loading...</span>
         </div>
         <p style={{ color: 'var(--text-muted, #888)', marginTop: '12px', fontSize: '14px' }}>
-          Авторизация...
+          Authorizing...
         </p>
       </div>
     </div>

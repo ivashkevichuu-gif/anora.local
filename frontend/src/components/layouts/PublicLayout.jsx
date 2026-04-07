@@ -24,7 +24,7 @@ export default function PublicLayout() {
         </div>
         <footer className="app-footer">
           <span>&copy; {new Date().getFullYear()} ANORA. All rights reserved.</span>
-          <span>Built with React &amp; PHP</span>
+          <span>Your chance for life growth.</span>
         </footer>
       </div>
     </div>

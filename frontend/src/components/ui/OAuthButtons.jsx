@@ -87,7 +87,7 @@ export default function OAuthButtons() {
         fontSize: '13px',
       }}>
         <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border, #333)' }} />
-        <span>или</span>
+        <span>or</span>
         <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border, #333)' }} />
       </div>
 
