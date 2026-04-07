@@ -43,7 +43,7 @@ class NowPaymentsClient
      */
     public function createInvoice(float $priceAmount, string $priceCurrency = 'usd'): array
     {
-        return $this->request('POST', '/v1/invoice', [
+        return $this->request('POST', '/invoice', [
             'price_amount'   => $priceAmount,
             'price_currency' => $priceCurrency,
         ]);
@@ -56,7 +56,7 @@ class NowPaymentsClient
      */
     public function createPayout(float $amount, string $address, string $currency): array
     {
-        return $this->request('POST', '/v1/payout', [
+        return $this->request('POST', '/payout', [
             'amount'  => $amount,
             'address' => $address,
             'currency' => $currency,
@@ -70,7 +70,7 @@ class NowPaymentsClient
      */
     public function getPaymentStatus(string $paymentId): array
     {
-        return $this->request('GET', '/v1/payment/' . urlencode($paymentId));
+        return $this->request('GET', '/payment/' . urlencode($paymentId));
     }
 
     /**
