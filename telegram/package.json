@@ -1,0 +1,13 @@
+{
+  "name": "anora-telegram",
+  "version": "1.0.0",
+  "description": "ANORA Telegram autopost service — game events to Telegram channel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ioredis": "^5.3.2",
+    "mysql2": "^3.9.0"
+  }
+}

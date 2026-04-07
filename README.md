@@ -1093,6 +1093,94 @@ ws://host/ws/game/100?token=<jwt>    — комната $100
 ws://host/ws/admin/live?token=<jwt>  — admin мониторинг
 ```
 
+## Telegram Bot (Game Autoposting)
+
+The platform includes a Telegram bot that automatically posts game events (new game started, game finished with winner) to a Telegram channel in real time.
+
+### Step 1: Create a Telegram Bot
+
+1. Open Telegram, search for `@BotFather`
+2. Send `/newbot`
+3. Choose a name: `ANORA Game Bot`
+4. Choose a username: `anora_game_bot` (must end with `bot`)
+5. BotFather will reply with a token like: `7123456789:AAH...`
+6. Copy the token — this is your `TELEGRAM_BOT_TOKEN`
+
+### Step 2: Create a Telegram Channel
+
+1. In Telegram, create a new channel (e.g. `ANORA Games`)
+2. Make it public with a username (e.g. `@anora_games`)
+3. Go to channel settings → Administrators → Add Administrator
+4. Search for your bot (`@anora_game_bot`) and add it as admin
+5. Give it permission to "Post Messages"
+6. Your `TELEGRAM_CHAT_ID` is `@anora_games` (the channel username with @)
+
+Alternatively, for a private channel:
+1. Add the bot as admin
+2. Send any message to the channel
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in browser
+4. Find `"chat":{"id":-100...}` — that negative number is your `TELEGRAM_CHAT_ID`
+
+### Step 3: Configure Environment Variables
+
+```bash
+nano /var/www/anora/.env
+```
+
+Add:
+
+```dotenv
+TELEGRAM_BOT_TOKEN=7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TELEGRAM_CHAT_ID=@anora_games
+TELEGRAM_RATE_LIMIT=20
+```
+
+### Step 4: Deploy the Bot
+
+```bash
+cd /var/www/anora
+docker compose up -d --build telegram
+```
+
+### Step 5: Verify
+
+```bash
+# Check logs
+docker compose logs -f telegram
+
+# Should see:
+# Telegram bot validated (bot_username: anora_game_bot)
+# Redis connected
+# MySQL pool created
+# Service started (channels: game:finished, bet:placed)
+```
+
+When a game finishes, the bot will post:
+
+```
+🏆 Game finished!
+
+🎰 Room $10
+💰 Bank: $30.00 USD
+👥 Players: 3
+🥇 Winner: CoolPlayer42
+💵 Won: $25.65 USD
+
+🎉 Congratulations!
+👇 Play now: https://anora.bet
+```
+
+### Troubleshooting (Telegram Bot)
+
+| Problem | Solution |
+|---------|----------|
+| `Missing required environment variable: TELEGRAM_BOT_TOKEN` | Add `TELEGRAM_BOT_TOKEN` to `.env` and rebuild: `docker compose up -d telegram` |
+| `Telegram getMe failed: HTTP 401` | Bot token is invalid. Get a new one from @BotFather |
+| `Telegram API error: HTTP 403` | Bot is not an admin of the channel, or `TELEGRAM_CHAT_ID` is wrong |
+| Bot starts but no messages | Check that games are being played. Bot only posts on `game:finished` and `bet:placed` Redis events |
+| Duplicate messages | Should not happen (Redis dedup). Check `docker compose logs telegram` for warnings |
+| `Redis subscriber error` | Redis container not running: `docker compose ps redis` |
+
 ## Тестирование
 
 ```bash
