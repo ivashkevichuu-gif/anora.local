@@ -86,8 +86,8 @@ export default function CryptoWithdrawForm({ defaultWallet, defaultCurrency }) {
             <label className="form-label">Amount (USD)</label>
             <input
               type="number" name="amount" className="form-control"
-              min="5" step="0.01" required
-              placeholder="Minimum $5.00"
+              min="100" step="0.01" required
+              placeholder="Minimum $100.00"
               value={form.amount} onChange={handle}
             />
           </div>

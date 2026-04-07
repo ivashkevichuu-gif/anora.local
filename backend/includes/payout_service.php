@@ -37,8 +37,8 @@ class PayoutService
         }
 
         // Validate minimum amount
-        if ($amountUsd < 5.00) {
-            throw new InvalidArgumentException('Minimum withdrawal is $5.00 USD');
+        if ($amountUsd < 100.00) {
+            throw new InvalidArgumentException('Minimum withdrawal is $100.00 USD');
         }
 
         // Check daily cap: sum of non-failed payouts today
