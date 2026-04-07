@@ -58,6 +58,10 @@ services:
       NOWPAYMENTS_SANDBOX: ${NOWPAYMENTS_SANDBOX}
       LOG_LEVEL: ${LOG_LEVEL}
       CORS_ORIGIN: ${CORS_ORIGIN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI}
+      FRONTEND_URL: ${FRONTEND_URL}
     depends_on:
       mysql:
         condition: service_healthy
