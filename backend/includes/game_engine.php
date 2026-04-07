@@ -520,16 +520,29 @@ class GameEngine
 
         // Publish game:finished event to Redis Pub/Sub (for Telegram bot + WebSocket)
         try {
-            require_once __DIR__ . '/redis_client.php';
-            $redisClient = RedisClient::getInstance();
-            if ($redisClient->isAvailable()) {
-                $redis = $redisClient->getConnection();
-                $redis->publish('game:finished', json_encode([
-                    'round_id'  => $roundId,
-                    'winner_id' => $winnerId,
-                    'room'      => (int) $round['room'],
-                    'winner_net' => $winnerNet,
-                ]));
+            if (class_exists('RedisClient', false)) {
+                $redisClient = RedisClient::getInstance();
+                if ($redisClient->isAvailable()) {
+                    $redis = $redisClient->getConnection();
+                    $redis->publish('game:finished', json_encode([
+                        'round_id'  => $roundId,
+                        'winner_id' => $winnerId,
+                        'room'      => (int) $round['room'],
+                        'winner_net' => $winnerNet,
+                    ]));
+                }
+            } elseif (extension_loaded('redis')) {
+                // Fallback: create a temporary Redis connection
+                $r = new \Redis();
+                if (@$r->connect(getenv('REDIS_HOST') ?: '127.0.0.1', (int)(getenv('REDIS_PORT') ?: 6379), 2.0)) {
+                    $r->publish('game:finished', json_encode([
+                        'round_id'  => $roundId,
+                        'winner_id' => $winnerId,
+                        'room'      => (int) $round['room'],
+                        'winner_net' => $winnerNet,
+                    ]));
+                    $r->close();
+                }
             }
         } catch (\Throwable $e) {
             error_log("[GameEngine] Failed to PUBLISH game:finished for round #$roundId: " . $e->getMessage());
