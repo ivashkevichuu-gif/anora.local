@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { authService } from '../services/authService'
 import StatusMessage from '../components/ui/StatusMessage'
+import OAuthButtons from '../components/ui/OAuthButtons'
 
 export default function Register() {
   const [form, setForm]       = useState({ email: '', password: '', confirm: '' })
@@ -76,6 +77,7 @@ export default function Register() {
             </button>
           </form>
         )}
+        {!success && <OAuthButtons />}
       </div>
 
       <p className="text-center mt-3" style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>

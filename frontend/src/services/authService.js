@@ -6,4 +6,5 @@ export const authService = {
   logout:    ()             => api.logout(),
   register:  (email, pass, referralCode = null)  => api.register({ email, password: pass, ...(referralCode ? { referral_code: referralCode } : {}) }),
   verify:    (token)        => api.verify({ token }),
+  oauthStart: (provider)    => api.oauthStart(provider),
 }

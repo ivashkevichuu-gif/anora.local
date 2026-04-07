@@ -24,8 +24,17 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  const loginWithTokens = async (accessToken, refreshToken) => {
+    // Store tokens for API client to use
+    localStorage.setItem('access_token', accessToken)
+    localStorage.setItem('refresh_token', refreshToken)
+    // Fetch user data with the new token
+    const d = await authService.getMe()
+    setUser(d.user)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, logout, loginWithTokens }}>
       {children}
     </AuthContext.Provider>
   )

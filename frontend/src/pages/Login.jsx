@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import StatusMessage from '../components/ui/StatusMessage'
+import OAuthButtons from '../components/ui/OAuthButtons'
 import { getCanvasFingerprint } from '../utils/fingerprint'
 import { api } from '../api/client'
 
@@ -65,6 +66,7 @@ export default function Login() {
             Sign in
           </button>
         </form>
+        <OAuthButtons />
       </div>
 
       <p className="text-center mt-3" style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>

@@ -11,7 +11,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id                      INT AUTO_INCREMENT PRIMARY KEY,
     email                   VARCHAR(255) NOT NULL UNIQUE,
-    password                VARCHAR(255) NOT NULL,
+    password                VARCHAR(255) NOT NULL DEFAULT '',
     balance                 DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     bank_details            TEXT DEFAULT NULL,
     verify_token            VARCHAR(64) DEFAULT NULL,
@@ -38,6 +38,23 @@ CREATE TABLE IF NOT EXISTS users (
 -- Self-referencing FK for referrals
 ALTER TABLE users ADD CONSTRAINT fk_referred_by
     FOREIGN KEY (referred_by) REFERENCES users(id) ON DELETE SET NULL;
+
+-- ── OAuth Accounts ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    user_id          INT NOT NULL,
+    provider         ENUM('google', 'apple') NOT NULL,
+    provider_user_id VARCHAR(255) NOT NULL,
+    provider_email   VARCHAR(255) DEFAULT NULL,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uniq_provider_user (provider, provider_user_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_provider_email (provider, provider_email),
+
+    CONSTRAINT fk_oauth_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── Fiat Transactions ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS transactions (

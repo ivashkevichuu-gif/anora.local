@@ -29,7 +29,25 @@ $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ?');
 $stmt->execute([$email]);
 $user = $stmt->fetch();
 
-if (!$user || !password_verify($password, $user['password'])) {
+if (!$user) {
+    $logger->audit('login', 'failure', null, $ipAddress, $userAgent, ['email' => $email]);
+    http_response_code(401);
+    echo json_encode(['error' => 'Invalid email or password.']);
+    exit;
+}
+
+// Reject OAuth-only users (empty password) before password_verify
+if ($user['password'] === '') {
+    $logger->audit('login', 'failure', (int)$user['id'], $ipAddress, $userAgent, [
+        'reason' => 'oauth_only_user',
+        'email'  => $email,
+    ]);
+    http_response_code(401);
+    echo json_encode(['error' => 'Используйте вход через Google или Apple']);
+    exit;
+}
+
+if (!password_verify($password, $user['password'])) {
     $logger->audit('login', 'failure', null, $ipAddress, $userAgent, ['email' => $email]);
     http_response_code(401);
     echo json_encode(['error' => 'Invalid email or password.']);

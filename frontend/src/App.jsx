@@ -14,6 +14,7 @@ const Register    = lazy(() => import('./pages/Register'))
 const Verify      = lazy(() => import('./pages/Verify'))
 const Account     = lazy(() => import('./pages/Account'))
 const About       = lazy(() => import('./pages/About'))
+const OAuthCallback = lazy(() => import('./pages/OAuthCallback'))
 const AdminLogin      = lazy(() => import('./pages/admin/AdminLogin'))
 const AdminLayout     = lazy(() => import('./components/AdminLayout'))
 
@@ -45,6 +46,9 @@ export default function App() {
                 <ProtectedRoute><Account /></ProtectedRoute>
               } />
             </Route>
+
+            {/* OAuth callback — no layout (no Navbar/Footer) */}
+            <Route path="/auth/callback" element={<OAuthCallback />} />
 
             {/* Admin routes — no public layout */}
             <Route path="/admin"       element={<Navigate to="/admin/login" replace />} />

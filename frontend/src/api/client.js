@@ -73,6 +73,11 @@ export const api = {
     body: JSON.stringify({ canvas_hash: canvasHash }),
   }),
 
+  // OAuth
+  oauthStart: (provider) => {
+    window.location.href = `${BASE}/auth/oauth_start.php?provider=${encodeURIComponent(provider)}`
+  },
+
   // Crypto
   cryptoDeposit:    body         => request('/account/crypto_deposit.php',  { method: 'POST', body: JSON.stringify(body) }),
   cryptoWithdraw:   body         => request('/account/crypto_withdraw.php', { method: 'POST', body: JSON.stringify(body) }),
