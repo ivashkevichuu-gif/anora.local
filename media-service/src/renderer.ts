@@ -6,7 +6,7 @@ import { config } from './config';
 import { logger } from './logger';
 import type { RoundDetails } from './db';
 
-const ENTRY_POINT = path.resolve(__dirname, './remotion/index.ts');
+const ENTRY_POINT = path.resolve('/app/src/remotion/index.ts');
 
 let bundled: string | null = null;
 
