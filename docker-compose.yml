@@ -197,6 +197,8 @@ services:
         condition: service_healthy
       websocket:
         condition: service_healthy
+    volumes:
+      - media_output:/app/media:ro
     networks:
       - anora-network
     healthcheck:
