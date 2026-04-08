@@ -102,7 +102,7 @@ body {
 .app-footer a:hover { color: var(--accent); }
 
 /* ── Bootstrap overrides for dark theme ── */
-.card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: none; }
+.card { background: var(--bg-surface); color: rgb(203, 213, 225); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: none; }
 .form-control, .form-select { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); }
 .form-control:focus, .form-select:focus { background: var(--bg-elevated); border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px rgba(124,58,237,.2); }
 .form-control::placeholder { color: var(--text-muted); }
