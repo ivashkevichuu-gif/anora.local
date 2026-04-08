@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 
 export default function Footer() {
@@ -9,25 +9,28 @@ export default function Footer() {
   }, [])
 
   return (
-    <footer className="bg-dark text-white-50 text-center py-3 mt-5">
-      <div className="container d-flex flex-column flex-sm-row justify-content-center align-items-center gap-3">
-        <small>&copy; {new Date().getFullYear()} ANORA. All rights reserved.</small>
-        <div className="d-flex gap-3">
-          {links.telegram_url && (
-            <a href={links.telegram_url} target="_blank" rel="noopener noreferrer"
-              className="text-white-50" style={{ fontSize: '1.25rem' }}
-              aria-label="Telegram">
-              <i className="bi bi-telegram" />
-            </a>
-          )}
-          {links.instagram_url && (
-            <a href={links.instagram_url} target="_blank" rel="noopener noreferrer"
-              className="text-white-50" style={{ fontSize: '1.25rem' }}
-              aria-label="Instagram">
-              <i className="bi bi-instagram" />
-            </a>
-          )}
-        </div>
+    <footer className="app-footer">
+      <span>&copy; {new Date().getFullYear()} ANORA. All rights reserved.</span>
+      <div className="d-flex align-items-center gap-3">
+        <span>Your chance for life growth.</span>
+        {links.instagram_url && (
+          <a href={links.instagram_url} target="_blank" rel="noopener noreferrer"
+            style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.2rem', transition: 'color .2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#E1306C'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+            aria-label="Instagram">
+            <i className="bi bi-instagram" />
+          </a>
+        )}
+        {links.telegram_url && (
+          <a href={links.telegram_url} target="_blank" rel="noopener noreferrer"
+            style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.2rem', transition: 'color .2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#0088cc'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+            aria-label="Telegram">
+            <i className="bi bi-telegram" />
+          </a>
+        )}
       </div>
     </footer>
   )

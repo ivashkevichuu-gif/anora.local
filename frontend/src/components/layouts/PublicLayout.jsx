@@ -1,13 +1,13 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from '../Sidebar'
+import Footer from '../Footer'
 
 export default function PublicLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
     <div className="app-shell">
-      {/* Mobile hamburger */}
       <button
         className="sidebar-toggle"
         onClick={() => setSidebarOpen(o => !o)}
@@ -22,10 +22,7 @@ export default function PublicLayout() {
         <div className="page-area">
           <Outlet />
         </div>
-        <footer className="app-footer">
-          <span>&copy; {new Date().getFullYear()} ANORA. All rights reserved.</span>
-          <span>Your chance for life growth.</span>
-        </footer>
+        <Footer />
       </div>
     </div>
   )

@@ -159,10 +159,10 @@ body {
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .sidebar { transform: translateX(-100%); }
-  .sidebar.open { transform: translateX(0); }
+  .sidebar.open { transform: translateX(0); padding-top: 35px;}
   .sidebar-overlay.open { display: block; }
   .sidebar-toggle { display: block; }
-  .main-content { margin-left: 0; padding-top: 20px; }
+  .main-content { margin-left: 0; padding-top: 35px; }
   .page-area { padding: 24px 18px; padding-top: 40px; }
   .sidebar-nav { padding-top: 20px; }
   .app-footer { padding: 14px 18px; flex-direction: column; gap: 6px; text-align: center; }

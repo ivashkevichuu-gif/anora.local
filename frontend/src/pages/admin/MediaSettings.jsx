@@ -83,7 +83,7 @@ function GlobalToggles({ data, onSave, saving }) {
   return (
     <div className="card bg-dark border-secondary">
       <div className="card-body d-flex align-items-center gap-4 flex-wrap">
-        <span className="fw-bold">Global:</span>
+        <span className="fw-bold" style={{ color: '#e2e8f0' }}>Global:</span>
         <div className="form-check form-switch">
           <input className="form-check-input" type="checkbox" checked={ig}
             onChange={e => setIg(e.target.checked)} id="globalIg" />
@@ -229,22 +229,22 @@ function SocialLinksCard({ data, onSave, saving }) {
 
   return (
     <div className="card bg-dark border-secondary mb-4">
-      <div className="card-header fw-bold">
+      <div className="card-header fw-bold" style={{ color: '#e2e8f0' }}>
         <i className="bi bi-link-45deg me-2" />Social Links (Footer)
       </div>
       <div className="card-body">
         <div className="row">
           <div className="col-md-6 mb-3">
-            <label className="form-label">Telegram URL</label>
-            <input type="url" className="form-control bg-dark text-white border-secondary"
-              value={tgUrl} onChange={e => setTgUrl(e.target.value)}
-              placeholder="https://t.me/anorachannel" />
-          </div>
-          <div className="col-md-6 mb-3">
-            <label className="form-label">Instagram URL</label>
+            <label className="form-label" style={{ color: '#cbd5e1' }}>Instagram URL</label>
             <input type="url" className="form-control bg-dark text-white border-secondary"
               value={igUrl} onChange={e => setIgUrl(e.target.value)}
               placeholder="https://instagram.com/anora.bet" />
+          </div>
+          <div className="col-md-6 mb-3">
+            <label className="form-label" style={{ color: '#cbd5e1' }}>Telegram URL</label>
+            <input type="url" className="form-control bg-dark text-white border-secondary"
+              value={tgUrl} onChange={e => setTgUrl(e.target.value)}
+              placeholder="https://t.me/anorachannel" />
           </div>
         </div>
         <button className="btn btn-primary" disabled={saving}
