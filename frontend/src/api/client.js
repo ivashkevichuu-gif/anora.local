@@ -114,4 +114,11 @@ export const api = {
     return request(`/admin/games_analytics.php?${qs}`);
   },
   adminGamesAnalyticsDetail: (roundId) => request(`/admin/games_analytics.php?round_id=${roundId}`),
+
+  // Media settings
+  adminMediaSettings:       ()     => request('/admin/media_settings.php'),
+  adminMediaSettingsUpdate:  body  => request('/admin/media_settings.php', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Public social links (no auth)
+  socialLinks: () => request('/admin/social_links_public.php'),
 }

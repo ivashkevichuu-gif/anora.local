@@ -154,6 +154,37 @@ services:
       - anora-network
     restart: unless-stopped
 
+  # ── Media Service (Instagram Reels + Telegram via BullMQ) ────────────────
+  media-service:
+    build:
+      context: .
+      dockerfile: docker/media-service/Dockerfile
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DB_HOST: ${DB_WRITE_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      INSTAGRAM_ACCESS_TOKEN: ${INSTAGRAM_ACCESS_TOKEN:-}
+      INSTAGRAM_USER_ID: ${INSTAGRAM_USER_ID:-}
+      VIDEO_OUTPUT_DIR: /app/out
+      VIDEO_PUBLIC_URL: ${VIDEO_PUBLIC_URL:-https://anora.bet/media}
+      LOG_LEVEL: ${LOG_LEVEL}
+    volumes:
+      - media_output:/app/out
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - anora-network
+    restart: unless-stopped
+
   # ── nginx API Gateway ────────────────────────────────────────────────────
   nginx:
     build:
@@ -179,6 +210,7 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  media_output:
 
 networks:
   anora-network:

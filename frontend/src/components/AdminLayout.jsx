@@ -12,6 +12,7 @@ import LedgerExplorer   from '../pages/admin/LedgerExplorer'
 import ActivityMonitor   from '../pages/admin/ActivityMonitor'
 import FinanceDashboard from '../pages/admin/FinanceDashboard'
 import GamesAnalytics  from '../pages/admin/GamesAnalytics'
+import MediaSettings   from '../pages/admin/MediaSettings'
 
 export default function AdminLayout() {
   const { adminLogout } = useAdmin()
@@ -42,6 +43,7 @@ export default function AdminLayout() {
           <NavLink to="/admin/activity-monitor" className={link}><i className="bi bi-shield-exclamation me-2"></i>Activity Monitor</NavLink>
           <NavLink to="/admin/finance" className={link}><i className="bi bi-graph-up me-2"></i>Finance Dashboard</NavLink>
           <NavLink to="/admin/games-analytics" className={link}><i className="bi bi-bar-chart-line me-2"></i>Games Analytics</NavLink>
+          <NavLink to="/admin/media" className={link}><i className="bi bi-camera-reels me-2"></i>Media Settings</NavLink>
         </nav>
         <div className="mt-auto">
           <button className="nav-link btn btn-link text-danger p-0" onClick={handleLogout}>
@@ -63,6 +65,7 @@ export default function AdminLayout() {
           <Route path="activity-monitor" element={<ActivityMonitor />} />
           <Route path="finance" element={<FinanceDashboard />} />
           <Route path="games-analytics" element={<GamesAnalytics />} />
+          <Route path="media"           element={<MediaSettings />} />
         </Routes>
       </div>
     </div>

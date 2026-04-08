@@ -1083,6 +1083,10 @@ certbot --nginx -d yourdomain.com
 | GET | /api/admin/games_analytics | Аналитика игр |
 | GET | /api/admin/activity_monitor | Мониторинг фрода |
 | GET | /api/admin/health_check | Проверка инвариантов |
+| GET | /api/admin/media_settings | Настройки медиа (Instagram, Telegram, соцсети) |
+| POST | /api/admin/media_settings | Обновить настройки медиа |
+| GET | /api/admin/media_posts | Лог медиа-постов с пагинацией |
+| GET | /api/admin/social_links_public | Публичные соцсети для footer (без авторизации) |
 
 WebSocket:
 
@@ -1181,6 +1185,344 @@ When a game finishes, the bot will post:
 | Duplicate messages | Should not happen (Redis dedup). Check `docker compose logs telegram` for warnings |
 | `Redis subscriber error` | Redis container not running: `docker compose ps redis` |
 
+## Media Service (Instagram Reels + Telegram Autopost)
+
+Платформа включает отдельный сервис для автоматической публикации игровых событий в Instagram (Reels) и Telegram. Сервис написан на Node.js + TypeScript, использует BullMQ для очередей и Remotion для рендеринга видео.
+
+### Архитектура
+
+```
+game_engine.php
+    │ PUBLISH game:finished / bet:placed
+    ▼
+┌──────────────────┐
+│   Redis Pub/Sub  │
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│  Room Watcher    │ ← подписка на события, фильтрация, дедупликация
+└────────┬─────────┘
+    ┌────┴────┐
+    ▼         ▼
+┌────────┐ ┌──────────┐
+│BullMQ  │ │ BullMQ   │
+│telegram│ │instagram │
+│-publish│ │-publish  │
+└───┬────┘ └────┬─────┘
+    ▼           ▼
+┌────────┐ ┌──────────────┐
+│Telegram│ │ Remotion     │
+│Bot API │ │ render → MP4 │
+└────────┘ │ → Meta Graph │
+           │   API publish│
+           └──────────────┘
+```
+
+### Настройка Telegram (детальная)
+
+#### Шаг 1: Создать бота
+
+1. Открыть Telegram, найти `@BotFather`
+2. Отправить `/newbot`
+3. Выбрать имя: `ANORA Game Bot`
+4. Выбрать username: `anora_game_bot` (должен заканчиваться на `bot`)
+5. BotFather ответит токеном вида: `7123456789:AAH...`
+6. Скопировать — это `TELEGRAM_BOT_TOKEN`
+
+#### Шаг 2: Создать канал
+
+1. В Telegram создать новый канал (например `ANORA Games`)
+2. Сделать публичным с username (например `@anora_games`)
+3. Настройки канала → Администраторы → Добавить администратора
+4. Найти бота (`@anora_game_bot`) и добавить как админа
+5. Дать права: "Публикация сообщений"
+6. `TELEGRAM_CHAT_ID` = `@anora_games` (username канала с @)
+
+Для приватного канала:
+1. Добавить бота как админа
+2. Отправить любое сообщение в канал
+3. Открыть `https://api.telegram.org/bot<TOKEN>/getUpdates`
+4. Найти `"chat":{"id":-100...}` — это отрицательное число и есть `TELEGRAM_CHAT_ID`
+
+#### Шаг 3: Переменные окружения
+
+В `.env`:
+
+```dotenv
+TELEGRAM_BOT_TOKEN=7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TELEGRAM_CHAT_ID=@anora_games
+TELEGRAM_RATE_LIMIT=20
+```
+
+#### Шаг 4: Настройка через админ-панель
+
+1. Зайти в Admin Panel → Media Settings
+2. Включить глобальный тогл "Telegram"
+3. В секции Telegram Settings:
+   - Enable Telegram posting: ✅
+   - Post new games: ✅ (отправлять сообщение когда игра стартует)
+   - Post finished games: ✅ (отправлять результат завершённой игры)
+4. Сохранить
+
+#### Шаг 5: Деплой
+
+```bash
+cd /var/www/anora
+docker compose up -d --build media-service
+```
+
+#### Шаг 6: Проверка
+
+```bash
+docker compose logs -f media-service
+
+# Должно быть:
+# Starting ANORA Media Service
+# RoomWatcher subscribed to game:finished, bet:placed
+# Telegram publisher worker started
+# Instagram publisher worker started
+# All workers started
+```
+
+Когда игра завершится, бот отправит:
+
+```
+🏆 Game Finished!
+
+🎰 Room $10
+💰 Bank: $30.00
+
+👥 Players:
+  🥇 CoolPlayer42 — $10.00 (33%) ← WINNER
+  👤 Player2 — $10.00 (33%)
+  👤 Player3 — $10.00 (33%)
+
+💵 Won: $29.10
+
+🎉 Congratulations!
+
+[🎮 Play Now]  ← inline кнопка
+```
+
+### Настройка Instagram Reels (детальная)
+
+Instagram публикация работает через Meta Graph API. Требуется бизнес-аккаунт Instagram, привязанный к Facebook Page.
+
+#### Шаг 1: Создать Facebook App
+
+1. Перейти на [Meta for Developers](https://developers.facebook.com/)
+2. My Apps → Create App
+3. Тип: Business
+4. Название: `ANORA Media Publisher`
+5. Привязать к Business Manager (если есть)
+
+#### Шаг 2: Добавить Instagram Graph API
+
+1. В настройках приложения → Add Products
+2. Найти "Instagram Graph API" → Set Up
+3. Перейти в Instagram Graph API → Settings
+
+#### Шаг 3: Подключить Instagram Business Account
+
+Требования:
+- Instagram аккаунт должен быть **Business** или **Creator** (не Personal)
+- Аккаунт должен быть привязан к **Facebook Page**
+
+Как переключить на Business:
+1. Instagram → Настройки → Аккаунт → Переключиться на профессиональный аккаунт
+2. Выбрать "Бизнес"
+3. Привязать к Facebook Page (создать новую если нет)
+
+#### Шаг 4: Получить Access Token
+
+Вариант A — через Graph API Explorer (для тестирования):
+
+1. Перейти в [Graph API Explorer](https://developers.facebook.com/tools/explorer/)
+2. Выбрать своё приложение
+3. Нажать "Generate Access Token"
+4. Выбрать permissions:
+   - `instagram_basic`
+   - `instagram_content_publish`
+   - `pages_read_engagement`
+   - `pages_show_list`
+5. Авторизовать
+6. Скопировать токен
+
+Этот токен живёт ~1 час. Для production нужен long-lived token.
+
+Вариант B — Long-Lived Token (для production):
+
+```bash
+# 1. Получить short-lived user token через Graph API Explorer (см. выше)
+
+# 2. Обменять на long-lived token (живёт 60 дней)
+curl -s "https://graph.facebook.com/v19.0/oauth/access_token?\
+grant_type=fb_exchange_token&\
+client_id=YOUR_APP_ID&\
+client_secret=YOUR_APP_SECRET&\
+fb_exchange_token=SHORT_LIVED_TOKEN"
+
+# Ответ: {"access_token":"LONG_LIVED_TOKEN","token_type":"bearer","expires_in":5184000}
+
+# 3. Получить Page Access Token (не истекает)
+curl -s "https://graph.facebook.com/v19.0/me/accounts?\
+access_token=LONG_LIVED_USER_TOKEN"
+
+# Найти нужную Page и скопировать её access_token
+# Этот Page Token не истекает (если у приложения есть manage_pages permission)
+```
+
+#### Шаг 5: Получить Instagram User ID
+
+```bash
+# Используя Page Access Token:
+curl -s "https://graph.facebook.com/v19.0/PAGE_ID?\
+fields=instagram_business_account&\
+access_token=PAGE_ACCESS_TOKEN"
+
+# Ответ: {"instagram_business_account":{"id":"17841400123456789"}}
+# Это ваш INSTAGRAM_USER_ID
+```
+
+Или через Graph API Explorer:
+1. Запрос: `GET /me/accounts?fields=instagram_business_account`
+2. Найти `instagram_business_account.id`
+
+#### Шаг 6: Переменные окружения
+
+В `.env`:
+
+```dotenv
+INSTAGRAM_ACCESS_TOKEN=EAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+INSTAGRAM_USER_ID=17841400123456789
+VIDEO_OUTPUT_DIR=./media-service/out
+VIDEO_PUBLIC_URL=https://anora.bet/media
+```
+
+`VIDEO_PUBLIC_URL` — публичный URL, по которому Meta сможет скачать видео. Nginx уже настроен раздавать файлы из `/media/`.
+
+#### Шаг 7: Настройка через админ-панель
+
+1. Admin Panel → Media Settings
+2. Включить глобальный тогл "Instagram"
+3. В секции Instagram Reels:
+   - Enable Instagram posting: ✅
+   - Allowed Rooms: выбрать комнаты (✅ $1, ✅ $10, ✅ $100)
+   - Min Win Amount: `5.00` (минимальный банк для публикации)
+   - Max Reels / Day: `10` (лимит постов в сутки)
+4. Сохранить
+
+#### Шаг 8: Деплой
+
+```bash
+cd /var/www/anora
+
+# Применить миграцию БД (создаёт таблицы media_settings, instagram_settings и т.д.)
+docker compose exec php-fpm php migrations/add_media_tables.php
+
+# Запустить/перезапустить media service
+docker compose up -d --build media-service
+```
+
+#### Шаг 9: Проверка
+
+```bash
+# Логи media service
+docker compose logs -f media-service
+
+# Проверить что видео рендерится (после завершения игры)
+docker compose exec media-service ls -la /app/out/
+
+# Проверить статус постов в админке
+# Admin Panel → Media Settings → Recent Posts
+```
+
+#### Как работает публикация Reel
+
+1. Игра завершается → `game_engine.php` публикует `game:finished` в Redis
+2. Room Watcher получает событие, проверяет фильтры:
+   - Instagram включён глобально и в настройках?
+   - Комната разрешена?
+   - Банк >= min_win_amount?
+   - Не превышен дневной лимит?
+   - Нет дубликата?
+3. Создаёт запись в `media_posts` и добавляет job в BullMQ
+4. Instagram Publisher Worker:
+   - Рендерит видео через Remotion (1080x1920, 30fps, 12 сек, H264)
+   - Загружает через Meta Graph API: создаёт контейнер → ждёт обработки → публикует
+5. Обновляет статус в `media_posts`, инкрементирует счётчик `posts_today`
+
+#### Обновление Instagram токена
+
+Long-lived Page Token не истекает, но если используется User Token (60 дней):
+
+```bash
+# Обновить токен до истечения
+curl -s "https://graph.facebook.com/v19.0/oauth/access_token?\
+grant_type=fb_exchange_token&\
+client_id=YOUR_APP_ID&\
+client_secret=YOUR_APP_SECRET&\
+fb_exchange_token=CURRENT_LONG_LIVED_TOKEN"
+```
+
+Обновить в `.env` и перезапустить:
+
+```bash
+docker compose restart media-service
+```
+
+#### Troubleshooting (Instagram)
+
+| Проблема | Решение |
+|----------|---------|
+| `Instagram credentials not configured` | Заполнить `INSTAGRAM_ACCESS_TOKEN` и `INSTAGRAM_USER_ID` в `.env` |
+| `Container creation failed` | Проверить что токен валиден и имеет permission `instagram_content_publish` |
+| `Container status: ERROR` | Видео не доступно по `VIDEO_PUBLIC_URL`. Проверить nginx location `/media/` и что файл существует |
+| `OAuthException: Invalid token` | Токен истёк. Обновить через Graph API Explorer или обменять на long-lived |
+| `Application does not have permission` | В Meta App Dashboard → App Review → запросить `instagram_content_publish` |
+| `Video too short/long` | Remotion рендерит 12 сек (360 frames @ 30fps). Instagram требует 3-90 сек |
+| `Daily limit reached` | Счётчик `posts_today` сбрасывается автоматически раз в сутки. Или сбросить вручную в админке |
+| Видео рендерится, но не публикуется | Проверить что `VIDEO_PUBLIC_URL` доступен из интернета: `curl -I https://anora.bet/media/game_123_xxx.mp4` |
+| `Chromium not found` | Docker образ включает Chromium. Для bare metal: `apt install chromium` |
+
+#### Troubleshooting (Telegram в Media Service)
+
+| Проблема | Решение |
+|----------|---------|
+| `Telegram not configured, skipping` | Заполнить `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` в `.env` |
+| `Telegram send failed: 403` | Бот не админ канала или неверный `TELEGRAM_CHAT_ID` |
+| `Telegram send failed: 401` | Невалидный `TELEGRAM_BOT_TOKEN` |
+| Дубликаты сообщений | Проверить что не запущен одновременно старый `telegram/server.js` и новый `media-service`. Выбрать один |
+| Сообщения не отправляются | Проверить что в Admin Panel включены: Global Telegram + Telegram Settings enabled |
+
+### Настройка Social Links (Footer)
+
+1. Admin Panel → Media Settings → Social Links
+2. Заполнить:
+   - Telegram URL: `https://t.me/anora_games`
+   - Instagram URL: `https://instagram.com/anora.bet`
+3. Сохранить
+
+Ссылки автоматически появятся в footer сайта с иконками Telegram и Instagram.
+
+### Миграция с существующего Telegram бота
+
+Если уже используется `telegram/server.js` (старый Telegram autopost сервис), есть два варианта:
+
+**Вариант A: Использовать только Media Service (рекомендуется)**
+
+1. Остановить старый сервис: `docker compose stop telegram`
+2. Убрать из `docker-compose.yml` или добавить `profiles: ["legacy"]`
+3. Настроить Media Service как описано выше
+4. Media Service берёт на себя и Telegram, и Instagram
+
+**Вариант B: Использовать оба параллельно**
+
+1. В Admin Panel → Media Settings → отключить глобальный тогл Telegram
+2. Старый `telegram/server.js` продолжает работать через Redis Pub/Sub напрямую
+3. Media Service обрабатывает только Instagram
+4. Минус: нет единого лога постов и управления через админку для Telegram
+
 ## Тестирование
 
 ```bash
@@ -1208,7 +1550,7 @@ vendor/bin/phpunit
 │   │   ├── auth/         # login, register, refresh, logout, me
 │   │   ├── game/         # bet, status, verify, fingerprint
 │   │   ├── account/      # deposits, withdrawals, stats
-│   │   ├── admin/        # dashboard, users, analytics
+│   │   ├── admin/        # dashboard, users, analytics, media_settings
 │   │   └── webhook/      # NOWPayments IPN
 │   ├── includes/         # Core services
 │   │   ├── jwt_service.php        # JWT auth (HS256)
@@ -1230,6 +1572,15 @@ vendor/bin/phpunit
 │   ├── tests/            # PHPUnit property-based tests
 │   └── game_worker.php   # Redis Streams game processor
 ├── frontend/             # React 18 + Vite
+├── media-service/        # Instagram Reels + Telegram autopost (Node.js + TypeScript)
+│   └── src/
+│       ├── workers/      # roomWatcher, telegramPublisher, instagramPublisher
+│       ├── publishers/   # telegram.ts, instagram.ts (Meta Graph API)
+│       ├── remotion/     # FinishedGameVideo.tsx (branded video component)
+│       ├── cron/         # dailyReset.ts (Instagram counter)
+│       ├── renderer.ts   # Remotion → MP4 (1080x1920, H264)
+│       └── index.ts      # Entry point
+├── telegram/             # Legacy Telegram autopost (Node.js)
 ├── websocket/            # Node.js WebSocket server
 ├── docker/               # Dockerfiles + nginx config
 ├── docker-compose.yml
