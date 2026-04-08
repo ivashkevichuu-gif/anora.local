@@ -120,5 +120,5 @@ export const api = {
   adminMediaSettingsUpdate:  body  => request('/admin/media_settings.php', { method: 'POST', body: JSON.stringify(body) }),
 
   // Public social links (no auth)
-  socialLinks: () => request('/admin/social_links_public.php'),
+  socialLinks: () => request('/public/social_links.php'),
 }
