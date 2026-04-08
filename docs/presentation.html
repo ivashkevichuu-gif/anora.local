@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANORA Platform — Technical Documentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root {
+    --bg: #0B0F1A;
+    --bg-surface: #111827;
+    --bg-card: rgba(255,255,255,0.03);
+    --neon-cyan: #00E5FF;
+    --neon-purple: #7A5CFF;
+    --neon-green: #00ff88;
+    --neon-gold: #FFC857;
+    --text: #E2E8F0;
+    --text-muted: #6B7280;
+    --border: rgba(255,255,255,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    body { background: var(--bg) !important; }
+    .page { break-after: page; break-inside: avoid; }
+    .no-break { break-inside: avoid; }
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 50px 45px;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    box-sizing: border-box;
+  }
+
+  /* Ambient glows */
+  .page::before {
+    content: '';
+    position: absolute;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(122,92,255,0.06) 0%, transparent 70%);
+    top: -150px; right: -150px;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .page::after {
+    content: '';
+    position: absolute;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,255,0.04) 0%, transparent 70%);
+    bottom: -100px; left: -100px;
+    filter: blur(60px);
+    pointer-events: none;
+  }
+
+  .page-content { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; }
+
+  /* Title page */
+  .title-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .logo {
+    font-size: 60px;
+    font-weight: 900;
+    letter-spacing: 12px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 40px rgba(0,229,255,0.4), 0 0 80px rgba(0,229,255,0.15);
+    margin-bottom: 16px;
+  }
+  .subtitle {
+    font-size: 18px;
+    color: var(--text-muted);
+    letter-spacing: 4px;
+    margin-bottom: 50px;
+  }
+  .tagline {
+    font-size: 18px;
+    color: var(--neon-gold);
+    letter-spacing: 2px;
+    padding: 12px 30px;
+    border: 1px solid rgba(255,200,87,0.3);
+    border-radius: 30px;
+    background: rgba(255,200,87,0.05);
+  }
+  .version {
+    margin-top: 40px;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  /* Section headers */
+  h1 {
+    font-size: 30px;
+    font-weight: 800;
+    margin-bottom: 30px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--neon-cyan);
+    display: inline-block;
+  }
+  h1 .icon { margin-right: 10px; }
+  h1 .accent { color: var(--neon-cyan); }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--neon-purple);
+    margin: 25px 0 12px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--neon-gold);
+    margin: 16px 0 8px;
+  }
+
+  p { margin-bottom: 10px; color: #CBD5E1; font-size: 14px; }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 16px 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .card-glow-cyan { border-color: rgba(0,229,255,0.2); box-shadow: 0 0 30px rgba(0,229,255,0.05); }
+  .card-glow-purple { border-color: rgba(122,92,255,0.2); box-shadow: 0 0 30px rgba(122,92,255,0.05); }
+  .card-glow-gold { border-color: rgba(255,200,87,0.2); box-shadow: 0 0 30px rgba(255,200,87,0.05); }
+  .card-glow-green { border-color: rgba(0,255,136,0.2); box-shadow: 0 0 30px rgba(0,255,136,0.05); }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; break-inside: avoid; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; break-inside: avoid; }
+
+  /* Stat boxes */
+  .stat {
+    text-align: center;
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    break-inside: avoid;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 4px;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 8px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+
+  /* Code */
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    background: rgba(0,229,255,0.08);
+    color: var(--neon-cyan);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  pre {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-size: 12px;
+    line-height: 1.5;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; color: #CBD5E1; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-cyan { background: rgba(0,229,255,0.1); color: var(--neon-cyan); border: 1px solid rgba(0,229,255,0.3); }
+  .badge-purple { background: rgba(122,92,255,0.1); color: var(--neon-purple); border: 1px solid rgba(122,92,255,0.3); }
+  .badge-green { background: rgba(0,255,136,0.1); color: var(--neon-green); border: 1px solid rgba(0,255,136,0.3); }
+  .badge-gold { background: rgba(255,200,87,0.1); color: var(--neon-gold); border: 1px solid rgba(255,200,87,0.3); }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+    break-inside: avoid;
+  }
+  .flow-box {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+  .flow-arrow { color: var(--neon-cyan); font-size: 18px; }
+
+  /* List */
+  ul { padding-left: 18px; margin: 8px 0; }
+  li { margin: 4px 0; color: #CBD5E1; font-size: 13px; }
+  li::marker { color: var(--neon-cyan); }
+
+  /* Divider */
+  hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 30px 0;
+  }
+
+  .text-cyan { color: var(--neon-cyan); }
+  .text-purple { color: var(--neon-purple); }
+  .text-green { color: var(--neon-green); }
+  .text-gold { color: var(--neon-gold); }
+  .text-muted { color: var(--text-muted); }
+  .fw-900 { font-weight: 900; }
+  .mt-20 { margin-top: 20px; }
+  .mb-20 { margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 1: Title -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page title-page">
+  <div class="page-content">
+    <div style="font-size:80px; margin-bottom:30px;">🎰</div>
+    <div class="logo">ANORA</div>
+    <div class="subtitle">GAMBLING PLATFORM</div>
+    <div class="tagline">Provably Fair · Crypto Payments · Real-Time</div>
+    <div class="version">v1.8.4739 · Technical Documentation</div>
+    <div style="margin-top:80px; display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
+      <span class="badge badge-cyan">PHP 8.4</span>
+      <span class="badge badge-purple">React 18</span>
+      <span class="badge badge-green">MySQL 8</span>
+      <span class="badge badge-gold">Redis 7</span>
+      <span class="badge badge-cyan">Docker</span>
+      <span class="badge badge-purple">WebSocket</span>
+      <span class="badge badge-green">Node.js 20</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 2: Architecture -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">🏗️</span> <span class="accent">Architecture</span> Overview</h1>
+
+    <div class="card card-glow-cyan">
+      <pre><code>
+  ┌─────────────┐     ┌─────────────┐
+  │  React SPA  │────▶│   nginx     │
+  │  Admin Panel│     │  API Gateway│
+  └─────────────┘     └──────┬──────┘
+                             │
+                ┌────────────┼────────────┐
+                ▼            ▼            ▼
+          ┌──────────┐ ┌──────────┐ ┌──────────┐
+          │ PHP-FPM  │ │WebSocket │ │  Static  │
+          │ REST API │ │ Real-time│ │  Assets  │
+          └────┬─────┘ └────┬─────┘ └──────────┘
+               │            │
+               ▼            ▼
+          ┌──────────────────────┐
+          │       Redis 7        │
+          │ Streams│Cache│Pub/Sub│
+          └──────────┬───────────┘
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+    ┌──────────┐ ┌────────┐ ┌────────────┐
+    │Game      │ │Telegram│ │  Media     │
+    │Worker x2 │ │Autopost│ │  Service   │
+    └────┬─────┘ └────────┘ └────────────┘
+         │
+         ▼
+    ┌────────────────────┐
+    │   MySQL 8 Master   │
+    │   (Read Replica)   │
+    └────────────────────┘
+      </code></pre>
+    </div>
+
+    <div class="grid-3 mt-20">
+      <div class="stat">
+        <div class="stat-value text-cyan">8</div>
+        <div class="stat-label">Docker Services</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value text-purple">3</div>
+        <div class="stat-label">Game Rooms</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value text-gold">$1 / $10 / $100</div>
+        <div class="stat-label">Room Stakes</div>
+      </div>
+    </div>
+
+    <h2>Tech Stack</h2>
+    <table>
+      <tr><th>Component</th><th>Technology</th></tr>
+      <tr><td>Backend API</td><td><code>PHP 8.4-FPM</code> (raw PDO, no framework)</td></tr>
+      <tr><td>Game Worker</td><td><code>PHP 8.4-CLI</code> (Redis Streams consumer)</td></tr>
+      <tr><td>WebSocket</td><td><code>Node.js 20</code> (ws + ioredis)</td></tr>
+      <tr><td>API Gateway</td><td><code>nginx</code> (rate limit, CORS, X-Request-ID)</td></tr>
+      <tr><td>Database</td><td><code>MySQL 8.0</code> InnoDB (write/read split)</td></tr>
+      <tr><td>Cache / Queue</td><td><code>Redis 7</code> (Streams + Pub/Sub + Cache)</td></tr>
+      <tr><td>Frontend</td><td><code>React 18</code> + Vite + Tailwind CSS</td></tr>
+      <tr><td>Media Service</td><td><code>Node.js + TypeScript</code> + Remotion + BullMQ</td></tr>
+      <tr><td>Containers</td><td><code>Docker</code> + docker-compose</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 3: Game Engine -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">🎮</span> Game <span class="accent">Engine</span></h1>
+
+    <h2>State Machine</h2>
+    <div class="flow">
+      <div class="flow-box" style="border-color: rgba(0,229,255,0.3);">⏳ waiting</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box" style="border-color: rgba(0,255,136,0.3);">🟢 active</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box" style="border-color: rgba(255,200,87,0.3);">🎰 spinning</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box" style="border-color: rgba(122,92,255,0.3);">✅ finished</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card card-glow-cyan no-break">
+        <h3>Bet Placement</h3>
+        <ul>
+          <li>Rate limit: 5/sec, 60/min per user</li>
+          <li>Lock <code>game_rounds</code> FOR UPDATE</li>
+          <li>Lock <code>user_balances</code> FOR UPDATE</li>
+          <li>Debit via LedgerService (idempotent)</li>
+          <li>≥2 players → transition to <span class="text-green">active</span></li>
+          <li>30-second countdown starts</li>
+        </ul>
+      </div>
+      <div class="card card-glow-gold no-break">
+        <h3>Winner Selection</h3>
+        <ul>
+          <li>SHA-256 combined hash (server + client seeds)</li>
+          <li>Binary search on cumulative weights</li>
+          <li>Payout: pot − 2% commission − 1% referral</li>
+          <li>Strict lock ordering (deadlock prevention)</li>
+          <li>3x retry on deadlock (50/100/150ms)</li>
+          <li>Immutable snapshot stored</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Provably Fair System</h2>
+    <div class="card card-glow-green">
+      <p>Every round is independently verifiable. Server seed (64-char hex) is committed before betting via SHA-256 hash, revealed after finish.</p>
+      <div class="flow">
+        <div class="flow-box">Server Seed Hash<br><span class="text-muted" style="font-size:11px;">shown during betting</span></div>
+        <span class="flow-arrow">+</span>
+        <div class="flow-box">Client Seeds<br><span class="text-muted" style="font-size:11px;">per-bet, auto-generated</span></div>
+        <span class="flow-arrow">=</span>
+        <div class="flow-box">Combined Hash<br><span class="text-muted" style="font-size:11px;">SHA-256 → float → winner</span></div>
+      </div>
+      <p class="text-muted" style="font-size:13px;">Verification endpoint: <code>GET /api/game/verify?game_id=N</code></p>
+    </div>
+
+    <h2>Game Worker</h2>
+    <div class="card">
+      <ul>
+        <li>Redis Streams consumer (<code>XREADGROUP BLOCK 5000</code>)</li>
+        <li>2 replicas for high availability</li>
+        <li>Heartbeat every 10s (<code>SETEX worker:{name}:heartbeat 30</code>)</li>
+        <li>Graceful shutdown on SIGTERM</li>
+        <li>Dead worker recovery via <code>XCLAIM</code></li>
+        <li>Publishes <code>game:finished</code> to Redis Pub/Sub</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 4: Financial System -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">💰</span> Financial <span class="accent">System</span></h1>
+
+    <p>All money movement goes through the append-only <strong>LedgerService</strong>. No balance can be modified without a corresponding ledger entry.</p>
+
+    <div class="grid-3 mb-20">
+      <div class="stat">
+        <div class="stat-value text-green">2%</div>
+        <div class="stat-label">Platform Commission</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value text-purple">1%</div>
+        <div class="stat-label">Referral Bonus</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value text-gold">97%</div>
+        <div class="stat-label">Winner Payout</div>
+      </div>
+    </div>
+
+    <h2>Ledger Entry Types</h2>
+    <table>
+      <tr><th>Type</th><th>Direction</th><th>Source</th></tr>
+      <tr><td><code>deposit</code></td><td><span class="text-green">credit</span></td><td>Fiat deposit</td></tr>
+      <tr><td><code>crypto_deposit</code></td><td><span class="text-green">credit</span></td><td>NOWPayments webhook</td></tr>
+      <tr><td><code>bet</code></td><td><span style="color:#f87171;">debit</span></td><td>GameEngine::placeBet()</td></tr>
+      <tr><td><code>win</code></td><td><span class="text-green">credit</span></td><td>GameEngine::finishRound()</td></tr>
+      <tr><td><code>system_fee</code></td><td><span class="text-green">credit</span></td><td>2% → System Account</td></tr>
+      <tr><td><code>referral_bonus</code></td><td><span class="text-green">credit</span></td><td>1% → referrer or System</td></tr>
+      <tr><td><code>withdrawal</code></td><td><span style="color:#f87171;">debit</span></td><td>Fiat withdrawal</td></tr>
+      <tr><td><code>crypto_withdrawal</code></td><td><span style="color:#f87171;">debit</span></td><td>PayoutService</td></tr>
+    </table>
+
+    <h2>Safety Guarantees</h2>
+    <div class="grid-2">
+      <div class="card card-glow-green no-break">
+        <h3>Race Condition Prevention</h3>
+        <ul>
+          <li><code>SELECT ... FOR UPDATE</code> on all financial ops</li>
+          <li>Strict lock ordering (deadlock prevention)</li>
+          <li>Balance check before debit (atomic)</li>
+          <li>Idempotent via unique constraints</li>
+        </ul>
+      </div>
+      <div class="card card-glow-purple no-break">
+        <h3>Invariant Checks (Reconciliation)</h3>
+        <ul>
+          <li>No money created from nothing</li>
+          <li>No money lost (sum of all entries = 0)</li>
+          <li>Every balance traceable to ledger</li>
+          <li>Runs every 5 minutes via cron</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Crypto Payments (NOWPayments)</h2>
+    <div class="card">
+      <div class="grid-2">
+        <div>
+          <h3>Deposits</h3>
+          <ul>
+            <li>Invoice creation via API</li>
+            <li>Webhook status tracking</li>
+            <li>Overpayment protection</li>
+            <li>Rate limit: 5/hour</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Withdrawals</h3>
+          <ul>
+            <li>Min $5, max $10k/day</li>
+            <li>>$500 requires admin approval</li>
+            <li>Atomic: debit → payout → refund on fail</li>
+            <li>HMAC-SHA512 webhook security</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 5: Media System -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">📸</span> Media <span class="accent">System</span></h1>
+
+    <p>Automated Instagram Reels generation and Telegram auto-posting for finished games.</p>
+
+    <div class="flow">
+      <div class="flow-box">game:finished<br><span class="text-muted" style="font-size:11px;">Redis Pub/Sub</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Room Watcher<br><span class="text-muted" style="font-size:11px;">filters + dedup</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">BullMQ<br><span class="text-muted" style="font-size:11px;">job queue</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Remotion<br><span class="text-muted" style="font-size:11px;">render MP4</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Publish<br><span class="text-muted" style="font-size:11px;">IG / download</span></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card card-glow-purple no-break">
+        <h3>🎬 Instagram Reels</h3>
+        <ul>
+          <li>1080×1920, 30fps, 12 seconds, H264</li>
+          <li>Remotion + Chromium + FFmpeg</li>
+          <li>Casino carousel animation</li>
+          <li>Countdown → Spin → Winner → Results</li>
+          <li>ANORA brand: neon cyan/purple/gold</li>
+          <li>Auto or Manual mode (render only)</li>
+          <li>Configurable: rooms, min win, daily limit</li>
+        </ul>
+      </div>
+      <div class="card card-glow-cyan no-break">
+        <h3>📲 Telegram Autopost</h3>
+        <ul>
+          <li>New game started notifications</li>
+          <li>Finished game results with players</li>
+          <li>HTML formatting + inline buttons</li>
+          <li>Rate limiting (20/min sliding window)</li>
+          <li>Retry with exponential backoff</li>
+          <li>Deduplication via Redis keys</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Admin Panel — Media Settings</h2>
+    <div class="card card-glow-gold">
+      <div class="grid-2">
+        <div>
+          <h3>Instagram Controls</h3>
+          <ul>
+            <li>Enable/disable toggle</li>
+            <li>Manual mode (render only, download MP4)</li>
+            <li>Allowed rooms ($1, $10, $100)</li>
+            <li>Min win amount filter</li>
+            <li>Max reels per day + counter</li>
+            <li>Delete video from server</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Telegram Controls</h3>
+          <ul>
+            <li>Enable/disable toggle</li>
+            <li>Post new games on/off</li>
+            <li>Post finished games on/off</li>
+          </ul>
+          <h3 style="margin-top:20px;">Social Links</h3>
+          <ul>
+            <li>Instagram URL → footer icon</li>
+            <li>Telegram URL → footer icon</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 6: Security & Anti-Fraud -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">🛡️</span> Security & <span class="accent">Anti-Fraud</span></h1>
+
+    <div class="grid-2">
+      <div class="card card-glow-green no-break">
+        <h3>🔒 Data Protection</h3>
+        <ul>
+          <li>Session-based auth with guards</li>
+          <li>JWT tokens with refresh rotation</li>
+          <li>HMAC-SHA512 webhook validation</li>
+          <li><code>hash_equals()</code> timing-attack safe</li>
+          <li>Row-level locking on all financial ops</li>
+          <li>Disposable email blocking</li>
+          <li>Nicknames instead of emails (privacy)</li>
+        </ul>
+      </div>
+      <div class="card card-glow-purple no-break">
+        <h3>🕵️ Fraud Detection</h3>
+        <ul>
+          <li>Win streak auto-flagging (≥10 wins/24h)</li>
+          <li>High velocity detection (≥50 bets/5min)</li>
+          <li>IP correlation (shared registration IPs)</li>
+          <li>Large withdrawal alerts (>$1000/7d)</li>
+          <li>Device fingerprinting (canvas hash)</li>
+          <li>Admin Activity Monitor dashboard</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Rate Limits</h2>
+    <table>
+      <tr><th>Action</th><th>Limit</th></tr>
+      <tr><td>Bets per second</td><td><span class="text-gold fw-900">5</span></td></tr>
+      <tr><td>Bets per minute</td><td><span class="text-gold fw-900">60</span></td></tr>
+      <tr><td>Crypto deposits per hour</td><td><span class="text-gold fw-900">5</span></td></tr>
+      <tr><td>Crypto withdrawals per day</td><td><span class="text-gold fw-900">3</span></td></tr>
+      <tr><td>Daily withdrawal cap</td><td><span class="text-gold fw-900">$10,000</span></td></tr>
+      <tr><td>nginx global rate</td><td><span class="text-gold fw-900">100 req/min</span> per IP</td></tr>
+    </table>
+
+    <h2>Admin Panel</h2>
+    <div class="card">
+      <div class="grid-3">
+        <div>
+          <h3 style="color:var(--neon-cyan);">Management</h3>
+          <ul>
+            <li>Users (ban, fraud flag)</li>
+            <li>Transactions</li>
+            <li>Withdrawals (approve/reject)</li>
+            <li>Lottery Games</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="color:var(--neon-green);">Finance</h3>
+          <ul>
+            <li>System Balance</li>
+            <li>Finance Dashboard</li>
+            <li>Ledger Explorer</li>
+            <li>Crypto Invoices/Payouts</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="color:var(--neon-gold);">Analytics</h3>
+          <ul>
+            <li>Games Analytics (RTP)</li>
+            <li>Activity Monitor</li>
+            <li>Health Check (invariants)</li>
+            <li>Media Settings</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 7: Frontend & UX -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">🎨</span> Frontend & <span class="accent">UX</span></h1>
+
+    <div class="card card-glow-purple">
+      <h3>Casino-Style Reel Animation</h3>
+      <p>200-tile weighted strip, winner at index 150. Three-phase easing with velocity-based motion blur. Gold center line with arrow indicators.</p>
+      <div class="grid-3">
+        <div class="stat">
+          <div class="stat-value text-cyan">5.5s</div>
+          <div class="stat-label">Spin Duration</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value text-gold">3s</div>
+          <div class="stat-label">Result Hold</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value text-purple">200</div>
+          <div class="stat-label">Strip Tiles</div>
+        </div>
+      </div>
+    </div>
+
+    <h2>Design System</h2>
+    <div class="card">
+      <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:40px; height:40px; border-radius:8px; background:#0B0F1A; border:1px solid var(--border);"></div>
+          <div><div style="font-size:12px; color:var(--text-muted);">Background</div><code>#0B0F1A</code></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:40px; height:40px; border-radius:8px; background:#00E5FF;"></div>
+          <div><div style="font-size:12px; color:var(--text-muted);">Neon Cyan</div><code>#00E5FF</code></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:40px; height:40px; border-radius:8px; background:#7A5CFF;"></div>
+          <div><div style="font-size:12px; color:var(--text-muted);">Neon Purple</div><code>#7A5CFF</code></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:40px; height:40px; border-radius:8px; background:#00ff88;"></div>
+          <div><div style="font-size:12px; color:var(--text-muted);">Neon Green</div><code>#00ff88</code></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:40px; height:40px; border-radius:8px; background:#FFC857;"></div>
+          <div><div style="font-size:12px; color:var(--text-muted);">Gold</div><code>#FFC857</code></div>
+        </div>
+      </div>
+      <p class="text-muted" style="font-size:13px;">Dark theme with CSS variables. Glow effects, particles, subtle motion. Bold geometric fonts with large numbers.</p>
+    </div>
+
+    <h2>Key Features</h2>
+    <div class="grid-2">
+      <div class="card no-break">
+        <h3 style="color:var(--neon-cyan);">Real-Time</h3>
+        <ul>
+          <li>WebSocket for live game updates</li>
+          <li>Framer Motion animations</li>
+          <li>Sound effects (bet, tick, win)</li>
+          <li>Balance win flash animation</li>
+        </ul>
+      </div>
+      <div class="card no-break">
+        <h3 style="color:var(--neon-green);">Architecture</h3>
+        <ul>
+          <li>React Router v6 (lazy-loaded pages)</li>
+          <li>AuthContext / AdminContext</li>
+          <li>useGameMachine state machine hook</li>
+          <li>Responsive sidebar (240px / hamburger)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 8: Deployment -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">🚀</span> <span class="accent">Deployment</span></h1>
+
+    <div class="card card-glow-cyan">
+      <h3>Docker Compose — 8 Services</h3>
+      <div class="grid-2" style="margin-top:15px;">
+        <div>
+          <ul>
+            <li><code>mysql</code> — Database (auto-init)</li>
+            <li><code>redis</code> — Cache, queues, pub/sub</li>
+            <li><code>php-fpm</code> — Backend API</li>
+            <li><code>game-worker</code> — ×2 replicas</li>
+          </ul>
+        </div>
+        <div>
+          <ul>
+            <li><code>websocket</code> — Real-time events</li>
+            <li><code>telegram</code> — Autopost service</li>
+            <li><code>media-service</code> — Video rendering</li>
+            <li><code>nginx</code> — API Gateway</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <h2>Quick Start</h2>
+    <pre><code>git clone &lt;repo&gt; anora && cd anora
+cp .env.example .env && nano .env
+cd frontend && npm ci && npm run build && cd ..
+docker-compose up -d --build
+docker-compose exec php-fpm php migrations/init.php</code></pre>
+
+    <h2>Cron Jobs</h2>
+    <table>
+      <tr><th>Job</th><th>Schedule</th><th>Purpose</th></tr>
+      <tr><td><code>reconciliation.php</code></td><td>Every 5 min</td><td>Financial invariant checks</td></tr>
+      <tr><td><code>cleanup.php</code></td><td>Daily 3:00</td><td>Stale data cleanup</td></tr>
+      <tr><td><code>worker_recovery.php</code></td><td>Every 1 min</td><td>Dead worker XCLAIM</td></tr>
+      <tr><td><code>partition_manager.php</code></td><td>Weekly Sun 2:00</td><td>DB partitioning</td></tr>
+      <tr><td><code>bot_runner.php</code></td><td>Every 2 sec</td><td>Bot liquidity</td></tr>
+    </table>
+
+    <h2>Production Checklist</h2>
+    <div class="card">
+      <div class="grid-2">
+        <div>
+          <ul>
+            <li>✅ SSL via Let's Encrypt</li>
+            <li>✅ UFW firewall (22, 80, 443)</li>
+            <li>✅ nginx reverse proxy</li>
+            <li>✅ Database backups (daily)</li>
+          </ul>
+        </div>
+        <div>
+          <ul>
+            <li>✅ Read replica support</li>
+            <li>✅ Structured JSON logging</li>
+            <li>✅ Health check endpoint</li>
+            <li>✅ Graceful shutdown (SIGTERM)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 9: API Reference -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-content">
+    <h1><span class="icon">📡</span> API <span class="accent">Reference</span></h1>
+
+    <h2>Authentication</h2>
+    <table>
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><span class="badge badge-green">POST</span></td><td><code>/api/auth/login</code></td><td>Login (JWT)</td></tr>
+      <tr><td><span class="badge badge-green">POST</span></td><td><code>/api/auth/register</code></td><td>Registration</td></tr>
+      <tr><td><span class="badge badge-green">POST</span></td><td><code>/api/auth/refresh</code></td><td>Token refresh</td></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/auth/me</code></td><td>Current user</td></tr>
+    </table>
+
+    <h2>Game</h2>
+    <table>
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><span class="badge badge-green">POST</span></td><td><code>/api/game/bet</code></td><td>Place a bet</td></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/game/status?room=N</code></td><td>Round state</td></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/game/verify?game_id=N</code></td><td>Provably fair verify</td></tr>
+    </table>
+
+    <h2>Admin</h2>
+    <table>
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/admin/finance_dashboard</code></td><td>Financial overview</td></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/admin/games_analytics</code></td><td>Games + RTP</td></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/admin/activity_monitor</code></td><td>Fraud flags</td></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/admin/health_check</code></td><td>Invariant checks</td></tr>
+      <tr><td><span class="badge badge-cyan">GET</span></td><td><code>/api/admin/media_settings</code></td><td>Media config</td></tr>
+      <tr><td><span class="badge badge-green">POST</span></td><td><code>/api/admin/media_settings</code></td><td>Update media config</td></tr>
+    </table>
+
+    <h2>WebSocket</h2>
+    <div class="card">
+      <pre><code>ws://host/ws/game/1?token=&lt;jwt&gt;      — Room $1
+ws://host/ws/game/10?token=&lt;jwt&gt;     — Room $10
+ws://host/ws/game/100?token=&lt;jwt&gt;    — Room $100
+ws://host/ws/admin/live?token=&lt;jwt&gt;  — Admin monitoring</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 10: Closing -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page title-page">
+  <div class="page-content">
+    <div style="font-size:60px; margin-bottom:30px;">🎰</div>
+    <div class="logo" style="font-size:56px;">ANORA.BET</div>
+    <div style="font-size:20px; color:var(--text-muted); margin:30px 0; max-width:600px; line-height:1.8;">
+      Production-ready gambling platform with provably fair gaming, crypto payments, real-time WebSocket events, automated media publishing, and comprehensive admin tools.
+    </div>
+    <hr style="width:200px; margin:40px auto;">
+    <div style="display:flex; gap:40px; justify-content:center; margin-top:20px;">
+      <div class="stat" style="min-width:120px;">
+        <div class="stat-value text-cyan" style="font-size:24px;">25+</div>
+        <div class="stat-label">PBT Tests</div>
+      </div>
+      <div class="stat" style="min-width:120px;">
+        <div class="stat-value text-purple" style="font-size:24px;">16</div>
+        <div class="stat-label">Admin Pages</div>
+      </div>
+      <div class="stat" style="min-width:120px;">
+        <div class="stat-value text-green" style="font-size:24px;">8</div>
+        <div class="stat-label">Docker Services</div>
+      </div>
+      <div class="stat" style="min-width:120px;">
+        <div class="stat-value text-gold" style="font-size:24px;">3</div>
+        <div class="stat-label">Game Rooms</div>
+      </div>
+    </div>
+    <div style="margin-top:60px; font-size:14px; color:var(--text-muted);">
+      Your chance for life growth.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
