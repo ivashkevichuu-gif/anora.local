@@ -13,7 +13,7 @@ require_once __DIR__ . '/../config/db.php';
 echo "=== Migration: add_instagram_manual_mode ===\n";
 
 $queries = [
-    "ALTER TABLE instagram_settings ADD COLUMN IF NOT EXISTS manual_mode TINYINT(1) NOT NULL DEFAULT 0 AFTER enabled",
+    "ALTER TABLE instagram_settings ADD COLUMN manual_mode TINYINT(1) NOT NULL DEFAULT 0 AFTER enabled",
 
     "ALTER TABLE media_posts MODIFY COLUMN status ENUM('queued','rendering','ready_for_download','publishing','published','failed') NOT NULL DEFAULT 'queued'",
 ];
