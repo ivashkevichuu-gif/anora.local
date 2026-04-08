@@ -13,7 +13,9 @@ import { publishReel } from '../publishers/instagram';
 /**
  * Instagram Publisher Worker — processes instagram-publish queue.
  *
- * Pipeline: fetch round → re-check filters → render video → upload → publish reel
+ * Pipeline: fetch round → re-check filters → render video → check mode:
+ *   - manual_mode=true  → set status 'ready_for_download', stop (admin downloads manually)
+ *   - manual_mode=false → upload to Meta Graph API → publish reel
  */
 
 export function startInstagramPublisher(): Worker {
@@ -25,7 +27,6 @@ export function startInstagramPublisher(): Worker {
       logger.info('Processing instagram job', { roundId, postId });
 
       try {
-        // Re-check settings (may have changed since queued)
         const igSettings = await getInstagramSettings();
         if (!igSettings?.enabled) {
           await updateMediaPost(postId, { status: 'failed', error_message: 'Instagram disabled' });
@@ -40,7 +41,6 @@ export function startInstagramPublisher(): Worker {
         const round = await fetchRoundDetails(roundId);
         if (!round) throw new Error(`Round ${roundId} not found`);
 
-        // Re-check filters
         if (!igSettings.allowed_rooms.includes(String(round.room))) {
           await updateMediaPost(postId, { status: 'failed', error_message: 'Room not allowed' });
           return;
@@ -51,16 +51,24 @@ export function startInstagramPublisher(): Worker {
           return;
         }
 
-        // Render video
+        // ── Render video ────────────────────────────────────────────────
         await updateMediaPost(postId, { status: 'rendering', attempts: job.attemptsMade + 1 });
         const videoPath = await renderFinishedGameVideo(round);
-        await updateMediaPost(postId, { video_path: videoPath });
-
-        // Build public URL for the video
         const videoFilename = videoPath.split('/').pop() || videoPath.split('\\').pop();
         const videoUrl = `${config.video.publicUrl}/${videoFilename}`;
+        await updateMediaPost(postId, { video_path: videoPath });
 
-        // Publish to Instagram
+        // ── Manual mode: stop after render ──────────────────────────────
+        if (igSettings.manual_mode) {
+          await updateMediaPost(postId, { status: 'ready_for_download' });
+          await incrementInstagramPostCount();
+          logger.info('Reel rendered (manual mode) — ready for download', {
+            roundId, postId, videoUrl,
+          });
+          return;
+        }
+
+        // ── Auto mode: publish to Instagram ─────────────────────────────
         await updateMediaPost(postId, { status: 'publishing' });
 
         const caption = [
@@ -94,7 +102,7 @@ export function startInstagramPublisher(): Worker {
           error_message: err.message,
           attempts: job.attemptsMade + 1,
         });
-        throw err; // Let BullMQ handle retry
+        throw err;
       }
     },
     {
@@ -104,11 +112,8 @@ export function startInstagramPublisher(): Worker {
         password: config.redis.password,
         maxRetriesPerRequest: null,
       },
-      concurrency: 1, // One render at a time (CPU intensive)
-      limiter: {
-        max: 5,
-        duration: 60000,
-      },
+      concurrency: 1,
+      limiter: { max: 5, duration: 60000 },
     }
   );
 

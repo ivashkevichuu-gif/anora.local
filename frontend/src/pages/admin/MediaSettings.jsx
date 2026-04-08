@@ -65,7 +65,7 @@ export default function MediaSettings() {
       <SocialLinksCard data={data.social_links} onSave={save} saving={saving} />
 
       {data.recent_posts && data.recent_posts.length > 0 && (
-        <RecentPosts posts={data.recent_posts} />
+        <RecentPosts posts={data.recent_posts} onRefresh={load} />
       )}
     </div>
   )
@@ -105,12 +105,14 @@ function GlobalToggles({ data, onSave, saving }) {
 
 function InstagramCard({ data, onSave, saving }) {
   const [enabled, setEnabled] = useState(!!data?.enabled)
+  const [manualMode, setManualMode] = useState(!!data?.manual_mode)
   const [rooms, setRooms] = useState(data?.allowed_rooms || [])
   const [minWin, setMinWin] = useState(data?.min_win_amount || 0)
   const [maxPosts, setMaxPosts] = useState(data?.max_posts_per_day || 10)
 
   useEffect(() => {
     setEnabled(!!data?.enabled)
+    setManualMode(!!data?.manual_mode)
     setRooms(data?.allowed_rooms || [])
     setMinWin(data?.min_win_amount || 0)
     setMaxPosts(data?.max_posts_per_day || 10)
@@ -133,7 +135,23 @@ function InstagramCard({ data, onSave, saving }) {
           <label className="form-check-label" htmlFor="igEnabled">Enable Instagram posting</label>
         </div>
 
-        <label className="form-label">Allowed Rooms</label>
+        <div className="form-check form-switch mb-3">
+          <input className="form-check-input" type="checkbox" checked={manualMode}
+            onChange={e => setManualMode(e.target.checked)} id="igManual"
+            style={manualMode ? { backgroundColor: '#f59e0b', borderColor: '#f59e0b' } : {}} />
+          <label className="form-check-label" htmlFor="igManual" style={{ color: '#cbd5e1' }}>
+            Manual mode
+            <span className="ms-2 badge" style={{
+              background: manualMode ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)',
+              color: manualMode ? '#f59e0b' : '#22c55e',
+              fontSize: '.7rem'
+            }}>
+              {manualMode ? 'Render only — download & post yourself' : 'Auto-publish via API'}
+            </span>
+          </label>
+        </div>
+
+        <label className="form-label" style={{ color: '#cbd5e1' }}>Allowed Rooms</label>
         <div className="d-flex gap-3 mb-3">
           {ROOMS.map(r => (
             <div className="form-check" key={r}>
@@ -145,13 +163,13 @@ function InstagramCard({ data, onSave, saving }) {
         </div>
 
         <div className="mb-3">
-          <label className="form-label">Min Win Amount ($)</label>
+          <label className="form-label" style={{ color: '#cbd5e1' }}>Min Win Amount ($)</label>
           <input type="number" className="form-control bg-dark text-white border-secondary"
             value={minWin} onChange={e => setMinWin(parseFloat(e.target.value) || 0)} step="0.01" />
         </div>
 
         <div className="mb-3">
-          <label className="form-label">Max Reels / Day</label>
+          <label className="form-label" style={{ color: '#cbd5e1' }}>Max Reels / Day</label>
           <input type="number" className="form-control bg-dark text-white border-secondary"
             value={maxPosts} onChange={e => setMaxPosts(parseInt(e.target.value) || 1)} min="1" />
         </div>
@@ -165,7 +183,7 @@ function InstagramCard({ data, onSave, saving }) {
         </div>
 
         <button className="btn btn-primary w-100" disabled={saving}
-          onClick={() => onSave('instagram', { enabled, allowed_rooms: rooms, min_win_amount: minWin, max_posts_per_day: maxPosts })}>
+          onClick={() => onSave('instagram', { enabled, manual_mode: manualMode, allowed_rooms: rooms, min_win_amount: minWin, max_posts_per_day: maxPosts })}>
           Save Instagram Settings
         </button>
       </div>
@@ -256,15 +274,40 @@ function SocialLinksCard({ data, onSave, saving }) {
   )
 }
 
-function RecentPosts({ posts }) {
+function RecentPosts({ posts, onRefresh }) {
+  const [deleting, setDeleting] = useState(null)
+
   const statusBadge = (s) => {
-    const map = { published: 'success', failed: 'danger', rendering: 'info', publishing: 'warning', queued: 'secondary' }
-    return <span className={`badge bg-${map[s] || 'secondary'}`}>{s}</span>
+    const map = {
+      published: 'success', failed: 'danger', rendering: 'info',
+      publishing: 'warning', queued: 'secondary', ready_for_download: 'warning'
+    }
+    const label = s === 'ready_for_download' ? '📥 ready' : s
+    return <span className={`badge bg-${map[s] || 'secondary'}`}>{label}</span>
+  }
+
+  const getDownloadUrl = (p) => {
+    if (!p.video_path) return null
+    const filename = p.video_path.split('/').pop()
+    return `/media/${filename}`
+  }
+
+  const handleDeleteVideo = async (postId) => {
+    if (!confirm('Delete this video file from server?')) return
+    setDeleting(postId)
+    try {
+      await api.adminMediaPostAction({ action: 'delete_video', post_id: postId })
+      if (onRefresh) await onRefresh()
+    } catch (e) {
+      alert('Delete failed: ' + e.message)
+    } finally {
+      setDeleting(null)
+    }
   }
 
   return (
     <div className="card bg-dark border-secondary">
-      <div className="card-header fw-bold">
+      <div className="card-header fw-bold" style={{ color: '#e2e8f0' }}>
         <i className="bi bi-clock-history me-2" />Recent Posts
       </div>
       <div className="card-body p-0">
@@ -277,18 +320,43 @@ function RecentPosts({ posts }) {
                 <th>Type</th>
                 <th>Status</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {posts.map(p => (
-                <tr key={p.id}>
-                  <td>#{p.round_id}</td>
-                  <td>{p.platform === 'instagram' ? '📸' : '📲'} {p.platform}</td>
-                  <td>{p.post_type}</td>
-                  <td>{statusBadge(p.status)}</td>
-                  <td>{new Date(p.created_at).toLocaleString()}</td>
-                </tr>
-              ))}
+              {posts.map(p => {
+                const downloadUrl = getDownloadUrl(p)
+                const canDownload = p.video_path && ['ready_for_download', 'published', 'failed'].includes(p.status)
+                return (
+                  <tr key={p.id}>
+                    <td>#{p.round_id}</td>
+                    <td>{p.platform === 'instagram' ? '📸' : '📲'} {p.platform}</td>
+                    <td>{p.post_type}</td>
+                    <td>{statusBadge(p.status)}</td>
+                    <td>{new Date(p.created_at).toLocaleString()}</td>
+                    <td>
+                      <div className="d-flex gap-1">
+                        {canDownload && downloadUrl && (
+                          <a href={downloadUrl} download className="btn btn-sm btn-outline-info"
+                            title="Download video">
+                            <i className="bi bi-download" />
+                          </a>
+                        )}
+                        {p.video_path && (
+                          <button className="btn btn-sm btn-outline-danger"
+                            title="Delete video from server"
+                            disabled={deleting === p.id}
+                            onClick={() => handleDeleteVideo(p.id)}>
+                            {deleting === p.id
+                              ? <span className="spinner-border spinner-border-sm" />
+                              : <i className="bi bi-trash" />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

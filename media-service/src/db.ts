@@ -103,6 +103,7 @@ export async function getInstagramSettings() {
   if (!r) return null;
   r.allowed_rooms = typeof r.allowed_rooms === 'string' ? JSON.parse(r.allowed_rooms) : r.allowed_rooms;
   r.enabled = !!r.enabled;
+  r.manual_mode = !!r.manual_mode;
   return r;
 }
 
@@ -137,7 +138,7 @@ export async function isDuplicatePost(roundId: number, platform: string, postTyp
   const db = getPool();
   const [rows] = await db.query(
     `SELECT id FROM media_posts
-     WHERE round_id = ? AND platform = ? AND post_type = ? AND status IN ('queued','rendering','publishing','published')
+     WHERE round_id = ? AND platform = ? AND post_type = ? AND status IN ('queued','rendering','ready_for_download','publishing','published')
      LIMIT 1`,
     [roundId, platform, postType]
   );

@@ -37,9 +37,11 @@ if ($method === 'GET') {
         if ($row) {
             $row['allowed_rooms'] = json_decode($row['allowed_rooms'], true) ?: [];
             $row['enabled'] = (bool)$row['enabled'];
+            $row['manual_mode'] = (bool)($row['manual_mode'] ?? 0);
         }
         $result['instagram'] = $row ?: [
             'enabled' => false,
+            'manual_mode' => false,
             'allowed_rooms' => [],
             'min_win_amount' => 0,
             'max_posts_per_day' => 10,
@@ -109,6 +111,7 @@ if ($method === 'POST') {
             $stmt = $pdo->prepare(
                 "UPDATE instagram_settings SET
                     enabled = ?,
+                    manual_mode = ?,
                     allowed_rooms = ?,
                     min_win_amount = ?,
                     max_posts_per_day = ?
@@ -116,6 +119,7 @@ if ($method === 'POST') {
             );
             $stmt->execute([
                 (int)($input['enabled'] ?? 0),
+                (int)($input['manual_mode'] ?? 0),
                 $allowedRooms,
                 (float)($input['min_win_amount'] ?? 0),
                 (int)($input['max_posts_per_day'] ?? 10),

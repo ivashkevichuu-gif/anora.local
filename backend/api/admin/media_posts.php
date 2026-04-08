@@ -92,6 +92,35 @@ if ($method === 'POST') {
         exit;
     }
 
+    if ($action === 'delete_video') {
+        $postId = (int)($input['post_id'] ?? 0);
+        if (!$postId) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing post_id']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT video_path FROM media_posts WHERE id = ?");
+        $stmt->execute([$postId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Post not found']);
+            exit;
+        }
+
+        $deleted = false;
+        if ($row['video_path'] && file_exists($row['video_path'])) {
+            $deleted = @unlink($row['video_path']);
+        }
+
+        $pdo->prepare("UPDATE media_posts SET video_path = NULL WHERE id = ?")->execute([$postId]);
+
+        echo json_encode(['success' => true, 'file_deleted' => $deleted]);
+        exit;
+    }
+
     http_response_code(400);
     echo json_encode(['error' => 'Unknown action']);
     exit;
