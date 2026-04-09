@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from '../../api/client'
+import Pagination from '../../components/ui/Pagination'
 
 const ROOMS = ['1', '10', '100']
 
@@ -9,20 +10,26 @@ export default function MediaSettings() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [data, setData] = useState(null)
+  const [postsPage, setPostsPage] = useState(1)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (page) => {
     try {
       setLoading(true)
-      const res = await api.adminMediaSettings()
+      const res = await api.adminMediaSettings(page || postsPage)
       setData(res)
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [postsPage])
 
   useEffect(() => { load() }, [load])
+
+  const handlePostsPageChange = (newPage) => {
+    setPostsPage(newPage)
+    load(newPage)
+  }
 
   const save = async (section, payload) => {
     try {
@@ -65,7 +72,14 @@ export default function MediaSettings() {
       <SocialLinksCard data={data.social_links} onSave={save} saving={saving} />
 
       {data.recent_posts && data.recent_posts.length > 0 && (
-        <RecentPosts posts={data.recent_posts} onRefresh={load} />
+        <RecentPosts
+          posts={data.recent_posts}
+          page={data.posts_page || 1}
+          totalPages={data.posts_pages || 1}
+          total={data.posts_total || 0}
+          onPageChange={handlePostsPageChange}
+          onRefresh={load}
+        />
       )}
     </div>
   )
@@ -274,7 +288,7 @@ function SocialLinksCard({ data, onSave, saving }) {
   )
 }
 
-function RecentPosts({ posts, onRefresh }) {
+function RecentPosts({ posts, page, totalPages, total, onPageChange, onRefresh }) {
   const [deleting, setDeleting] = useState(null)
 
   const statusBadge = (s) => {
@@ -361,6 +375,14 @@ function RecentPosts({ posts, onRefresh }) {
           </table>
         </div>
       </div>
+      {totalPages > 1 && (
+        <div className="card-footer bg-dark border-secondary px-3 py-2">
+          <div className="d-flex align-items-center justify-content-between">
+            <span className="text-muted" style={{ fontSize: '.8rem' }}>{total} posts</span>
+            <Pagination page={page} totalPages={totalPages} onChange={onPageChange} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

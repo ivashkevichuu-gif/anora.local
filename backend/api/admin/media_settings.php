@@ -72,12 +72,23 @@ if ($method === 'GET') {
         ];
     }
 
-    // Recent posts log
+    // Recent posts log (paginated)
     if ($section === 'all' || $section === 'posts') {
-        $stmt = $pdo->query(
-            "SELECT * FROM media_posts ORDER BY created_at DESC LIMIT 50"
+        $postsPage = max(1, (int)($_GET['posts_page'] ?? 1));
+        $postsLimit = 15;
+        $postsOffset = ($postsPage - 1) * $postsLimit;
+
+        $countStmt = $pdo->query("SELECT COUNT(*) FROM media_posts");
+        $postsTotal = (int)$countStmt->fetchColumn();
+
+        $stmt = $pdo->prepare(
+            "SELECT * FROM media_posts ORDER BY created_at DESC LIMIT ? OFFSET ?"
         );
+        $stmt->execute([$postsLimit, $postsOffset]);
         $result['recent_posts'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $result['posts_total'] = $postsTotal;
+        $result['posts_page'] = $postsPage;
+        $result['posts_pages'] = max(1, (int)ceil($postsTotal / $postsLimit));
     }
 
     echo json_encode($result);

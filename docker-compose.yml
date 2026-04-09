@@ -128,8 +128,9 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-  # ── Telegram Autopost ─────────────────────────────────────────────────────
+  # ── Telegram Autopost (LEGACY — disabled, replaced by media-service) ────────
   telegram:
+    profiles: ["legacy"]
     build:
       context: .
       dockerfile: docker/telegram/Dockerfile

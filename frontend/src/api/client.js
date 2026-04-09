@@ -116,7 +116,7 @@ export const api = {
   adminGamesAnalyticsDetail: (roundId) => request(`/admin/games_analytics.php?round_id=${roundId}`),
 
   // Media settings
-  adminMediaSettings:       ()     => request('/admin/media_settings.php'),
+  adminMediaSettings:       (postsPage = 1) => request(`/admin/media_settings.php?posts_page=${postsPage}`),
   adminMediaSettingsUpdate:  body  => request('/admin/media_settings.php', { method: 'POST', body: JSON.stringify(body) }),
   adminMediaPostAction:      body  => request('/admin/media_posts.php', { method: 'POST', body: JSON.stringify(body) }),
 
