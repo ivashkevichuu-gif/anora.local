@@ -82,9 +82,9 @@ if ($method === 'GET') {
         $postsTotal = (int)$countStmt->fetchColumn();
 
         $stmt = $pdo->prepare(
-            "SELECT * FROM media_posts ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            "SELECT * FROM media_posts ORDER BY created_at DESC LIMIT " . (int)$postsLimit . " OFFSET " . (int)$postsOffset
         );
-        $stmt->execute([$postsLimit, $postsOffset]);
+        $stmt->execute();
         $result['recent_posts'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $result['posts_total'] = $postsTotal;
         $result['posts_page'] = $postsPage;
