@@ -3,11 +3,145 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ANORA</title>
+
+    <!-- Primary SEO -->
+    <title>ANORA — Provably Fair Crypto Lottery | Play & Win</title>
+    <meta name="description" content="ANORA is a provably fair lottery platform with real-time gameplay, crypto deposits (BTC, ETH, USDT), three game rooms ($1, $10, $100), and instant payouts. Every result is cryptographically verifiable." />
+    <meta name="keywords" content="provably fair, crypto lottery, online gambling, bitcoin lottery, ethereum, USDT, crypto casino, real-time lottery, verifiable gaming, anora" />
+    <meta name="author" content="ANORA" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://anora.bet/" />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="theme-color" content="#0f0a1a" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#0B0F1A" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="msapplication-navbutton-color" content="#0f0a1a" />
+    <meta name="msapplication-navbutton-color" content="#0B0F1A" />
+    <meta name="msapplication-TileColor" content="#0B0F1A" />
+
+    <!-- Open Graph (Facebook, Telegram, Discord) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ANORA" />
+    <meta property="og:title" content="ANORA — Provably Fair Crypto Lottery" />
+    <meta property="og:description" content="Play in real-time lottery rooms with crypto. Every game is provably fair and verifiable. Rooms: $1, $10, $100. Instant payouts." />
+    <meta property="og:url" content="https://anora.bet/" />
+    <meta property="og:image" content="https://anora.bet/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ANORA — Provably Fair Crypto Lottery" />
+    <meta name="twitter:description" content="Real-time lottery with crypto payments. Provably fair, instant payouts, three game rooms." />
+    <meta name="twitter:image" content="https://anora.bet/og-image.png" />
+
+    <!-- JSON-LD: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "ANORA",
+      "url": "https://anora.bet",
+      "logo": "https://anora.bet/favicon.svg",
+      "description": "Provably fair crypto lottery platform with real-time gameplay and instant payouts.",
+      "sameAs": [],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "support@anora.bet",
+        "contactType": "customer support"
+      }
+    }
+    </script>
+
+    <!-- JSON-LD: WebSite (enables sitelinks search box in Google) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "ANORA",
+      "url": "https://anora.bet",
+      "description": "Provably fair crypto lottery platform",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://anora.bet/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- JSON-LD: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "ANORA",
+      "url": "https://anora.bet",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Web",
+      "description": "Real-time provably fair lottery with crypto deposits and withdrawals. Three rooms: $1, $10, $100.",
+      "offers": {
+        "@type": "Offer",
+        "price": "1.00",
+        "priceCurrency": "USD",
+        "description": "Minimum bet starting from $1"
+      },
+      "featureList": [
+        "Provably Fair (SHA-256 verifiable)",
+        "Crypto payments (BTC, ETH, USDT, 50+ coins)",
+        "Real-time WebSocket gameplay",
+        "Three game rooms ($1, $10, $100)",
+        "Instant payouts (97% to winner)",
+        "Referral program (1% bonus)"
+      ]
+    }
+    </script>
+
+    <!-- JSON-LD: FAQPage -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is ANORA?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ANORA is a provably fair lottery platform where players compete in real-time raffle rounds. Place your bet, watch the countdown, and see if luck is on your side. Every game result is cryptographically verifiable."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does Provably Fair work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Every round uses a server seed (hidden until the round ends) combined with all player client seeds via SHA-256 hashing. After the round finishes, the server seed is revealed so anyone can independently verify the result."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What cryptocurrencies are supported?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ANORA supports BTC, ETH, LTC, USDT, TRX, SOL, BNB, MATIC, DOGE and 50+ other cryptocurrencies via NOWPayments."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How are payouts calculated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The winner receives 97% of the pot. A 2% platform fee is charged, and 1% goes as a referral bonus to the person who invited the winner."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

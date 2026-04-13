@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import LotteryPanel from '../components/lottery/LotteryPanel'
+import { useSEO } from '../hooks/useSEO'
 
 const ROOMS = [
   { id: 1, label: '$1' },
@@ -8,6 +9,7 @@ const ROOMS = [
 ]
 
 export default function Home() {
+  useSEO('Play Provably Fair Lottery', 'Join real-time lottery rooms with crypto. $1, $10, $100 stakes. Every game is provably fair and verifiable.')
   const [activeRoom, setActiveRoom] = useState(1)
 
   return (

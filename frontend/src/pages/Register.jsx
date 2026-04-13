@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { authService } from '../services/authService'
 import StatusMessage from '../components/ui/StatusMessage'
 import OAuthButtons from '../components/ui/OAuthButtons'
+import { useSEO } from '../hooks/useSEO'
 
 export default function Register() {
+  useSEO('Register', 'Create your ANORA account. Play provably fair lottery with crypto deposits. Rooms from $1.')
   const [form, setForm]       = useState({ email: '', password: '', confirm: '' })
   const [error, setError]     = useState(null)
   const [success, setSuccess] = useState(null)

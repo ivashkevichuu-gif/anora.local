@@ -1,4 +1,5 @@
 import React from 'react'
+import { useSEO } from '../hooks/useSEO'
 
 const SECTIONS = [
   { icon: 'bi-dice-5-fill', color: '#7c3aed', title: 'What is ANORA?',
@@ -20,6 +21,7 @@ const SECTIONS = [
 ]
 
 export default function About() {
+  useSEO('About', 'Learn about ANORA — a provably fair crypto lottery platform with real-time gameplay, SHA-256 verification, and instant payouts.')
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto" style={{ maxWidth: 700 }}>
       <h2 className="mb-1 fw-700">About ANORA</h2>

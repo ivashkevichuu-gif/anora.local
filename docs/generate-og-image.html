@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate OG Image</title></head>
+<body style="margin:0; background:#000; display:flex; flex-direction:column; align-items:center; padding:40px; gap:20px;">
+  <p style="color:#fff; font-family:sans-serif;">Click the button to download og-image.png (1200×630)</p>
+  <canvas id="c" width="1200" height="630" style="border:1px solid #333; max-width:100%;"></canvas>
+  <button id="btn" style="padding:12px 30px; font-size:16px; cursor:pointer; background:#00E5FF; color:#000; border:none; border-radius:8px; font-weight:700;">Download PNG</button>
+  <script>
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, 1200, 630);
+    bg.addColorStop(0, '#0B0F1A');
+    bg.addColorStop(0.5, '#111827');
+    bg.addColorStop(1, '#0B0F1A');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    // Glow orbs
+    const g1 = ctx.createRadialGradient(240, 190, 0, 240, 190, 300);
+    g1.addColorStop(0, 'rgba(122,92,255,0.12)');
+    g1.addColorStop(1, 'rgba(122,92,255,0)');
+    ctx.fillStyle = g1;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    const g2 = ctx.createRadialGradient(960, 440, 0, 960, 440, 250);
+    g2.addColorStop(0, 'rgba(0,229,255,0.1)');
+    g2.addColorStop(1, 'rgba(0,229,255,0)');
+    ctx.fillStyle = g2;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    // Particles
+    [[150,120,3,'#00E5FF',0.4],[1050,80,2,'#7A5CFF',0.5],[200,500,2.5,'#FFC857',0.3],
+     [980,520,3,'#00E5FF',0.3],[400,60,2,'#FFC857',0.4],[800,570,2,'#7A5CFF',0.4],
+     [100,300,1.5,'#00E5FF',0.5],[1100,280,2,'#FFC857',0.3]].forEach(([x,y,r,color,op]) => {
+      ctx.globalAlpha = op;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+
+    // ANORA
+    ctx.font = '900 88px Inter, Segoe UI, sans-serif';
+    ctx.fillStyle = '#00E5FF';
+    ctx.shadowColor = '#00E5FF';
+    ctx.shadowBlur = 30;
+    ctx.fillText('ANORA', 600, 220);
+    ctx.shadowBlur = 0;
+
+    // Tagline
+    ctx.font = '400 22px Inter, Segoe UI, sans-serif';
+    ctx.fillStyle = '#6B7280';
+    ctx.fillText('PROVABLY FAIR CRYPTO LOTTERY', 600, 272);
+
+    // Divider
+    ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(400, 305); ctx.lineTo(800, 305); ctx.stroke();
+
+    // Badges
+    function badge(x, y, w, text, color) {
+      ctx.strokeStyle = color + '55';
+      ctx.fillStyle = color + '18';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(x - w/2, y, w, 36, 18); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = '600 13px Inter, sans-serif';
+      ctx.fillText(text, x, y + 23);
+    }
+    badge(285, 330, 170, '🔒 Provably Fair', '#00E5FF');
+    badge(495, 330, 150, '₿ Crypto', '#7A5CFF');
+    badge(700, 330, 160, '⚡ Real-Time', '#FFC857');
+    badge(915, 330, 170, '💰 Instant Pay', '#00ff88');
+
+    // Rooms
+    function room(x, text, color) {
+      ctx.font = '900 34px Inter, sans-serif';
+      ctx.fillStyle = color;
+      ctx.shadowColor = color; ctx.shadowBlur = 15;
+      ctx.fillText(text, x, 445);
+      ctx.shadowBlur = 0;
+    }
+    room(420, '$1', '#FFC857');
+    ctx.fillStyle = '#6B7280'; ctx.font = '16px sans-serif'; ctx.fillText('•', 540, 437);
+    room(600, '$10', '#7A5CFF');
+    ctx.fillStyle = '#6B7280'; ctx.font = '16px sans-serif'; ctx.fillText('•', 660, 437);
+    room(780, '$100', '#00E5FF');
+
+    // URL
+    ctx.font = '400 17px Inter, sans-serif';
+    ctx.fillStyle = '#4B5563';
+    ctx.fillText('anora.bet', 600, 525);
+
+    // Border
+    ctx.strokeStyle = 'rgba(0,229,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(2, 2, 1196, 626, 8); ctx.stroke();
+
+    document.getElementById('btn').onclick = () => {
+      const a = document.createElement('a');
+      a.download = 'og-image.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+    };
+  </script>
+</body>
+</html>

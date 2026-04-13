@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import StatusMessage from '../components/ui/StatusMessage'
 import OAuthButtons from '../components/ui/OAuthButtons'
+import { useSEO } from '../hooks/useSEO'
 import { getCanvasFingerprint } from '../utils/fingerprint'
 import { api } from '../api/client'
 
 export default function Login() {
+  useSEO('Login', 'Sign in to your ANORA account to play provably fair lottery games with crypto.')
   const { login }   = useAuth()
   const navigate    = useNavigate()
   const [form, setForm]   = useState({ email: '', password: '' })
