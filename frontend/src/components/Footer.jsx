@@ -31,26 +31,30 @@ export default function Footer() {
 
   return (
     <footer className="app-footer">
+
+      {/* Trust Wallet */}
+      <span>Protected by 
+      <a href="https://trustwallet.com"
+        target="_blank" rel="noopener noreferrer nofollow"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem',
+          textDecoration: 'none', transition: 'color .2s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = '#00D2A0'}
+        onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+        aria-label="Trust Wallet — payments powered by"
+      >
+        <TrustWalletIcon size={16} />
+        <span>Trust Wallet</span>
+      </a>
+      .
+      </span>
+
       <span>&copy; {new Date().getFullYear()} ANORA. All rights reserved.</span>
 
       <div className="d-flex align-items-center gap-3 flex-wrap" style={{ justifyContent: 'center' }}>
         <span>Your chance for life growth.</span>
-
-        {/* Trust Wallet */}
-        <a href="https://trustwallet.com"
-          target="_blank" rel="noopener noreferrer nofollow"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem',
-            textDecoration: 'none', transition: 'color .2s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = '#00D2A0'}
-          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
-          aria-label="Trust Wallet — payments powered by"
-        >
-          <TrustWalletIcon size={16} />
-          <span>Trust Wallet</span>
-        </a>
 
         {/* Social icons */}
         {links.instagram_url && (
