@@ -8,11 +8,11 @@ require_once __DIR__ . '/includes/game_engine.php';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const BOT_FORCE_JOIN_BELOW  = 2;      // force a bot in if fewer unique players
-const BOT_MAX_BETS_PER_GAME = 15;     // hard cap per bot per round
+const BOT_MAX_BETS_PER_GAME = 200;     // hard cap per bot per round
 const BOT_MIN_BALANCE       = 50.0;
 const BOT_TOPUP_AMOUNT      = 1000.0;
 const BOT_MAX_BALANCE       = 50000;
-const BOT_ROOMS             = [1];
+const BOT_ROOMS             = [1,10,100];
 
 // Strategy thresholds
 const BOT_TARGET_WIN_CHANCE  = 0.35;  // bots aim for ~35% win chance per round

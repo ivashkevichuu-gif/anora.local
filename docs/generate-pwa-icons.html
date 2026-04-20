@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate PWA Icons</title></head>
+<body style="margin:0; background:#000; display:flex; flex-direction:column; align-items:center; padding:40px; gap:20px; font-family:sans-serif;">
+  <p style="color:#fff;">Click buttons to download PWA icons</p>
+  <div style="display:flex; gap:20px;">
+    <div>
+      <canvas id="c192" width="192" height="192" style="border:1px solid #333;"></canvas>
+      <br><button onclick="dl('c192','icon-192.png')" style="margin-top:8px; padding:8px 16px; cursor:pointer;">Download 192×192</button>
+    </div>
+    <div>
+      <canvas id="c512" width="512" height="512" style="border:1px solid #333;"></canvas>
+      <br><button onclick="dl('c512','icon-512.png')" style="margin-top:8px; padding:8px 16px; cursor:pointer;">Download 512×512</button>
+    </div>
+  </div>
+  <script>
+    function draw(id, size) {
+      const c = document.getElementById(id);
+      const ctx = c.getContext('2d');
+      const r = size * 0.22;
+
+      // Rounded rect background
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, r);
+      ctx.fillStyle = '#0B0F1A';
+      ctx.fill();
+
+      // Gradient overlay
+      const g = ctx.createLinearGradient(0, 0, size, size);
+      g.addColorStop(0, 'rgba(122,92,255,0.15)');
+      g.addColorStop(1, 'rgba(0,229,255,0.1)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, r);
+      ctx.fill();
+
+      // Letter A
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `900 ${size * 0.48}px Inter, sans-serif`;
+      ctx.fillStyle = '#00E5FF';
+      ctx.shadowColor = '#00E5FF';
+      ctx.shadowBlur = size * 0.08;
+      ctx.fillText('A', size / 2, size / 2 - size * 0.02);
+      ctx.shadowBlur = 0;
+
+      // Subtle border
+      ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+      ctx.lineWidth = size * 0.01;
+      ctx.beginPath();
+      ctx.roundRect(size * 0.02, size * 0.02, size * 0.96, size * 0.96, r * 0.9);
+      ctx.stroke();
+    }
+
+    draw('c192', 192);
+    draw('c512', 512);
+
+    function dl(id, name) {
+      const a = document.createElement('a');
+      a.download = name;
+      a.href = document.getElementById(id).toDataURL('image/png');
+      a.click();
+    }
+  </script>
+</body>
+</html>

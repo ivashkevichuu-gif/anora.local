@@ -37,6 +37,12 @@ function easeCasino(t: number): number {
 const VW = 1080;
 const VH = 1920;
 
+// Instagram Reels safe zones (top: camera UI, bottom: like/comment/share + caption)
+const SAFE_TOP = 180;
+const SAFE_BOTTOM = 300;
+const SAFE_H = VH - SAFE_TOP - SAFE_BOTTOM; // 1440px usable
+const SY = (pct: number) => SAFE_TOP + SAFE_H * pct; // safe Y position helper
+
 const TILE_W = 80;
 const TILE_GAP = 10;
 const TILE_STEP = TILE_W + TILE_GAP;
@@ -97,13 +103,13 @@ export const FinishedGameVideo: React.FC<{ room: RoomData }> = ({ room }) => {
 
       {/* ANORA header — always visible */}
       <div style={{
-        position: 'absolute', top: 80, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.0), width: '100%', textAlign: 'center',
         fontSize: 34, fontWeight: 900, letterSpacing: 8, color: '#00E5FF',
         textShadow: '0 0 20px rgba(0,229,255,0.4)',
         opacity: interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' }),
       }}>ANORA.BET</div>
       <div style={{
-        position: 'absolute', top: 135, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.04), width: '100%', textAlign: 'center',
         fontSize: 20, color: '#6B7280', letterSpacing: 3,
         opacity: interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' }),
       }}>ROOM ${room.room}</div>
@@ -123,7 +129,7 @@ export const FinishedGameVideo: React.FC<{ room: RoomData }> = ({ room }) => {
 
       {/* Footer */}
       <div style={{
-        position: 'absolute', bottom: 60, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.95), width: '100%', textAlign: 'center',
         fontSize: 20, color: '#4B5563', letterSpacing: 2,
         opacity: interpolate(frame, [330, 350], [0, 0.7], { extrapolateRight: 'clamp' }),
       }}>anora.bet · Play & Win</div>
@@ -147,9 +153,9 @@ function CountdownPhase({ pot, players }: { pot: number; players: Player[] }) {
 
   return (
     <AbsoluteFill>
-      {/* Pot — 25% from top */}
+      {/* Pot — 18% */}
       <div style={{
-        position: 'absolute', top: VH * 0.22, width: '100%', textAlign: 'center', opacity: potOpacity,
+        position: 'absolute', top: SY(0.15), width: '100%', textAlign: 'center', opacity: potOpacity,
       }}>
         <div style={{ fontSize: 18, color: '#6B7280', letterSpacing: 4, marginBottom: 10 }}>TOTAL POT</div>
         <div style={{
@@ -160,23 +166,23 @@ function CountdownPhase({ pot, players }: { pot: number; players: Player[] }) {
         }}>${pot.toFixed(2)}</div>
       </div>
 
-      {/* Draw in label — 42% */}
+      {/* Draw in label */}
       <div style={{
-        position: 'absolute', top: VH * 0.42, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.38), width: '100%', textAlign: 'center',
         fontSize: 18, color: '#6B7280', letterSpacing: 4,
       }}>DRAW IN</div>
 
-      {/* Countdown number — center 47% */}
+      {/* Countdown number */}
       <div style={{
-        position: 'absolute', top: VH * 0.46, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.42), width: '100%', textAlign: 'center',
         fontSize: 180, fontWeight: 900, color: numColor,
         textShadow: `0 0 50px ${glowColor}`,
         transform: `scale(${numScale})`, opacity: numOpacity,
       }}>{countdownNum}</div>
 
-      {/* Progress bar — 62% */}
+      {/* Progress bar */}
       <div style={{
-        position: 'absolute', top: VH * 0.64, left: (VW - 700) / 2, width: 700, height: 8,
+        position: 'absolute', top: SY(0.62), left: (VW - 700) / 2, width: 700, height: 8,
         borderRadius: 4, background: 'rgba(255,255,255,0.08)',
       }}>
         <div style={{
@@ -185,9 +191,9 @@ function CountdownPhase({ pot, players }: { pot: number; players: Player[] }) {
         }} />
       </div>
 
-      {/* Player avatars — 72% */}
+      {/* Player avatars */}
       <div style={{
-        position: 'absolute', top: VH * 0.72, width: '100%',
+        position: 'absolute', top: SY(0.70), width: '100%',
         display: 'flex', gap: 24, justifyContent: 'center',
       }}>
         {players.slice(0, 6).map((p, i) => {
@@ -229,15 +235,15 @@ function CarouselPhase({ strip }: { strip: Player[] }) {
 
   return (
     <AbsoluteFill>
-      {/* Label — 35% */}
+      {/* Label */}
       <div style={{
-        position: 'absolute', top: VH * 0.35, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.30), width: '100%', textAlign: 'center',
         fontSize: 20, color: '#6B7280', letterSpacing: 4,
       }}>🎰 SELECTING WINNER…</div>
 
-      {/* Carousel — center 45% */}
+      {/* Carousel */}
       <div style={{
-        position: 'absolute', top: VH * 0.45 - 65, left: (VW - REEL_W) / 2,
+        position: 'absolute', top: SY(0.42), left: (VW - REEL_W) / 2,
         width: REEL_W, height: 130, overflow: 'hidden', borderRadius: 22,
         background: 'rgba(0,0,0,0.35)',
         border: revealed ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)',
@@ -306,9 +312,9 @@ function WinnerReveal({ winner, winnerNet, pot, strip }: {
         background: 'radial-gradient(ellipse at 50% 50%, rgba(245,158,11,0.5) 0%, transparent 65%)',
       }} />
 
-      {/* Frozen carousel — 22% */}
+      {/* Frozen carousel */}
       <div style={{
-        position: 'absolute', top: VH * 0.22, left: (VW - REEL_W) / 2,
+        position: 'absolute', top: SY(0.12), left: (VW - REEL_W) / 2,
         width: REEL_W, height: 130, overflow: 'hidden', borderRadius: 22,
         background: 'rgba(0,0,0,0.35)',
         border: '1px solid rgba(245,158,11,0.4)',
@@ -346,15 +352,15 @@ function WinnerReveal({ winner, winnerNet, pot, strip }: {
         </div>
       </div>
 
-      {/* Winner label — 40% */}
+      {/* Winner label */}
       <div style={{
-        position: 'absolute', top: VH * 0.40, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.35), width: '100%', textAlign: 'center',
         fontSize: 20, color: '#6B7280', letterSpacing: 4, opacity: nameOpacity,
       }}>🏆 WINNER</div>
 
-      {/* Avatar — 45% */}
+      {/* Avatar */}
       <div style={{
-        position: 'absolute', top: VH * 0.45, left: VW / 2 - 50,
+        position: 'absolute', top: SY(0.40), left: VW / 2 - 50,
         width: 100, height: 100, borderRadius: '50%', background: avatarColor(winner),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 32, fontWeight: 900, color: '#fff',
@@ -362,25 +368,25 @@ function WinnerReveal({ winner, winnerNet, pot, strip }: {
         boxShadow: `0 0 ${glowPulse}px rgba(245,158,11,0.6)`,
       }}>{winner.slice(0, 2).toUpperCase()}</div>
 
-      {/* Name — 55% */}
+      {/* Name */}
       <div style={{
-        position: 'absolute', top: VH * 0.55, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.52), width: '100%', textAlign: 'center',
         fontSize: 48, fontWeight: 900, color: '#FFC857', opacity: nameOpacity,
       }}>{winner}</div>
 
-      {/* Amount — 62% */}
+      {/* Amount */}
       <div style={{
-        position: 'absolute', top: VH * 0.62, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.60), width: '100%', textAlign: 'center',
         fontSize: 64, fontWeight: 900,
         background: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         filter: 'drop-shadow(0 0 14px rgba(245,158,11,0.7))',
         transform: `scale(${amountScale})`, opacity: amountOpacity,
-      }}>+${winnerNet.toFixed(2)}</div>
+      }}>+${pot.toFixed(2)}</div>
 
-      {/* Subtitle — 70% */}
+      {/* Subtitle */}
       <div style={{
-        position: 'absolute', top: VH * 0.70, width: '100%', textAlign: 'center',
+        position: 'absolute', top: SY(0.68), width: '100%', textAlign: 'center',
         fontSize: 22, color: '#6B7280', opacity: amountOpacity,
       }}>wins the pot!</div>
 
@@ -389,7 +395,7 @@ function WinnerReveal({ winner, winnerNet, pot, strip }: {
         const angle = (i / 24) * Math.PI * 2;
         const dist = interpolate(frame, [0, 20], [0, 120 + (i % 3) * 50], { extrapolateRight: 'clamp' });
         const cx = VW / 2;
-        const cy = VH * 0.50;
+        const cy = SY(0.46);
         const x = cx + Math.cos(angle) * dist;
         const y = cy + Math.sin(angle) * dist;
         const opacity = interpolate(frame, [0, 8, 30], [0, 0.8, 0], { extrapolateRight: 'clamp' });
@@ -421,7 +427,7 @@ function ResultsTable({ players, winner, pot }: {
   return (
     <AbsoluteFill>
       <div style={{
-        position: 'absolute', top: VH * 0.12, left: (VW - 940) / 2,
+        position: 'absolute', top: SY(0.05), left: (VW - 940) / 2,
         width: 940, borderRadius: 28, padding: '50px 45px',
         background: 'rgba(255,255,255,0.02)',
         border: '1px solid rgba(255,255,255,0.06)',

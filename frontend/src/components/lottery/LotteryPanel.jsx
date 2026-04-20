@@ -74,8 +74,10 @@ export default function LotteryPanel({ room = 1 }) {
   const frozenPreviousRef = useRef(previous)
   useEffect(() => {
     const isAnimating = machine.phase === 'DRAWING' || machine.phase === 'RESULT'
-    if (!isAnimating) {
-      // Animation ended — update to latest
+    // Always accept first non-null value (initial load)
+    if (frozenPreviousRef.current === null && previous !== null) {
+      frozenPreviousRef.current = previous
+    } else if (!isAnimating) {
       frozenPreviousRef.current = previous
     }
   }, [machine.phase, previous])

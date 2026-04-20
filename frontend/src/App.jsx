@@ -6,6 +6,7 @@ import PublicLayout    from './components/layouts/PublicLayout'
 import ProtectedRoute  from './components/ProtectedRoute'
 import AdminRoute      from './components/AdminRoute'
 import Spinner         from './components/ui/Spinner'
+import InstallBanner   from './components/InstallBanner'
 
 // Lazy-loaded pages — each page is a separate chunk
 const Home        = lazy(() => import('./pages/Home'))
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        <InstallBanner />
       </AdminProvider>
     </AuthProvider>
   )
