@@ -39,7 +39,7 @@ export default function Footer() {
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem',
-          textDecoration: 'none', transition: 'color .2s', verticalAlign: bottom,
+          textDecoration: 'none', transition: 'color .2s', verticalAlign: 'bottom'
         }}
         onMouseEnter={e => e.currentTarget.style.color = '#00D2A0'}
         onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
