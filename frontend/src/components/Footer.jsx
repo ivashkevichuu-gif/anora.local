@@ -33,13 +33,13 @@ export default function Footer() {
     <footer className="app-footer">
 
       {/* Trust Wallet */}
-      <span>Protected by 
+      <span>Protected by&nbsp;&nbsp;
       <a href="https://trustwallet.com"
         target="_blank" rel="noopener noreferrer nofollow"
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem',
-          textDecoration: 'none', transition: 'color .2s',
+          textDecoration: 'none', transition: 'color .2s', verticalAlign: bottom,
         }}
         onMouseEnter={e => e.currentTarget.style.color = '#00D2A0'}
         onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
