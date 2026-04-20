@@ -63,7 +63,7 @@ function BalanceCard({ user }) {
 
 const PUBLIC_LINKS = [
   { to: '/',        icon: 'bi-house-fill',        label: 'Home' },
-  { to: '/about',   icon: 'bi-info-circle-fill',   label: 'About Us' },
+  { to: '/about',   icon: 'bi-info-circle-fill',   label: 'Info' },
 ]
 const AUTH_LINKS = [
   { to: '/account', icon: 'bi-wallet2',            label: 'Account' },
