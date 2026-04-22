@@ -152,26 +152,28 @@ export default function LotteryPanel({ room = 1 }) {
           boxShadow: '0 0 60px rgba(124,58,237,0.08), inset 0 1px 0 rgba(255,255,255,0.05)',
         }}
       >
-        {/* Freeze overlay during spin */}
-        {uiLocked && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="absolute inset-0 rounded-3xl flex items-center justify-center z-20"
-            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-          >
-            <div className="flex flex-col items-center gap-3">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                className="w-10 h-10 rounded-full border-2"
-                style={{ borderColor: 'var(--neon-gold)', borderTopColor: 'transparent' }}
+        {/* Freeze overlay during spin — blurred background + winner animation on top */}
+        <AnimatePresence>
+          {uiLocked && (
+            <motion.div
+              key="winner-overlay"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 rounded-3xl z-20 flex flex-col items-center justify-center"
+              style={{
+                background: 'rgba(0,0,0,0.55)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+              }}
+            >
+              <WinnerAnimation
+                bets={machine.bets}
+                winner={machine.winner}
+                pot={machine.pot}
+                phase={machine.phase}
               />
-              <span className="text-sm font-semibold" style={{ color: 'var(--neon-gold)' }}>
-                Drawing winner…
-              </span>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Top bar */}
         <div className="w-full flex items-center justify-between">
@@ -285,31 +287,6 @@ export default function LotteryPanel({ room = 1 }) {
           )}
         </div>
       </motion.div>
-
-      {/* ── Winner animation — persistent, state-driven ── */}
-      <AnimatePresence>
-        {(machine.phase === 'DRAWING' || machine.phase === 'RESULT') && (
-          <motion.div
-            key="winner-panel"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="rounded-3xl p-6"
-            style={{
-              background: 'linear-gradient(145deg, rgba(245,158,11,0.08), rgba(124,58,237,0.08))',
-              border: '1px solid rgba(245,158,11,0.2)',
-              boxShadow: '0 0 40px rgba(245,158,11,0.1)',
-            }}
-          >
-            <WinnerAnimation
-              bets={machine.bets}
-              winner={machine.winner}
-              pot={machine.pot}
-              phase={machine.phase}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── Live bets ── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
