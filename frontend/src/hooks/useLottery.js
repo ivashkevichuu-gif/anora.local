@@ -16,7 +16,6 @@ export function useLottery(onBalanceUpdate, room = 1) {
   const [balance, setBalance]     = useState(null)
   const [betting, setBetting]     = useState(false)
   const [betError, setBetError]   = useState(null)
-  const [loading, setLoading]     = useState(true)
   const [lastClientSeed, setLastClientSeed] = useState(() => generateClientSeed())
 
   const intervalRef   = useRef(null)
@@ -24,10 +23,11 @@ export function useLottery(onBalanceUpdate, room = 1) {
   const onBalanceRef  = useRef(onBalanceUpdate)
   useEffect(() => { onBalanceRef.current = onBalanceUpdate }, [onBalanceUpdate])
 
-  // Reset only error when room changes — keep state visible until new data arrives
+  // Reset game state when room changes
   useEffect(() => {
+    setState(null)
+    setPrevious(null)
     setBetError(null)
-    setLoading(true)
   }, [room])
 
   // Map the status endpoint response shape to the state used by components
@@ -80,7 +80,6 @@ export function useLottery(onBalanceUpdate, room = 1) {
       const mapped = mapStatusResponse(d)
       setState(mapped)
       setPrevious(d.previous ?? null)
-      setLoading(false)
 
       // Extract userId from my_stats presence or balance
       if (d.balance != null) {
@@ -145,7 +144,7 @@ export function useLottery(onBalanceUpdate, room = 1) {
   }, [room, mapBetResponse])
 
   return {
-    state, previous, userId, balance, betting, betError, placeBet, loading,
+    state, previous, userId, balance, betting, betError, placeBet,
     clientSeed: lastClientSeed,
   }
 }

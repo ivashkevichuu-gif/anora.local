@@ -141,7 +141,23 @@ export default function LotteryPanel({ room = 1 }) {
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto">
 
-      {/* ── Main panel ── */}
+      {/* Loading state — show spinner until first data arrives */}
+      {!lotteryState && (
+        <div className="rounded-3xl p-8 flex items-center justify-center"
+          style={{
+            background: 'linear-gradient(145deg, rgba(124,58,237,0.08), rgba(0,255,136,0.04))',
+            border: '1px solid rgba(255,255,255,0.08)',
+            minHeight: 300,
+          }}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="spinner-border" style={{ color: 'var(--neon-purple)', width: 32, height: 32 }} />
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading room...</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Main panel — only render when data is available ── */}
+      {lotteryState && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -287,6 +303,7 @@ export default function LotteryPanel({ room = 1 }) {
           )}
         </div>
       </motion.div>
+      )}
 
       {/* ── Live bets ── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
