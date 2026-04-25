@@ -12,7 +12,7 @@ const BOT_MAX_BETS_PER_GAME = 200;     // hard cap per bot per round
 const BOT_MIN_BALANCE       = 50.0;
 const BOT_TOPUP_AMOUNT      = 1000.0;
 const BOT_MAX_BALANCE       = 50000;
-const BOT_ROOMS             = [1,10,100];
+const BOT_ROOMS             = [1];
 
 // Strategy thresholds
 const BOT_TARGET_WIN_CHANCE  = 0.35;  // bots aim for ~35% win chance per round
